@@ -229,4 +229,9 @@ class User extends Authenticatable
     {
         return $this->hasOne(Wallet::class);
     }
+
+    public function resultLinks(): HasMany
+    {
+        return $this->hasMany(ParentResultLink::class, 'parent_id');
+    }
 }

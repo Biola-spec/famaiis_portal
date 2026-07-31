@@ -16,6 +16,7 @@ use App\Http\Controllers\Backend\Setup\DesignationController;
 use App\Http\Controllers\Backend\Setup\SchoolSectionController;
 use App\Http\Controllers\Backend\SettingController;
 use App\Http\Controllers\Backend\RoleController;
+use App\Http\Controllers\Backend\ParentResultLinkController;
 use App\Http\Controllers\Backend\ParentController;
 use App\Models\SiteSetting;
 use App\Http\Controllers\Backend\EventController;
@@ -84,6 +85,9 @@ Route::get('/', function() {
 })->name('portal');
 Route::get('/home', function() { return redirect()->route('portal'); })->name('home');
 
+Route::get('/r/{token}', [ParentResultLinkController::class, 'show'])->name('parent.result.link');
+Route::get('/r/{token}/report', [ParentResultLinkController::class, 'reportCard'])->name('parent.result.link.report');
+
 Route::middleware('auth')->get('/admin/logout', [AdminController::class, 'Logout'])->name('admin.logout');
  
  
@@ -142,6 +146,9 @@ Route::get('/edit/{id}', [ParentController::class, 'ParentEdit'])->name('parent.
 Route::post('/update/{id}', [ParentController::class, 'ParentUpdate'])->name('parent.update');
 
 Route::get('/delete/{id}', [ParentController::class, 'ParentDelete'])->name('parent.delete');
+
+Route::post('/result-link/{parentId}', [ParentResultLinkController::class, 'store'])->name('parent.result.link.store');
+Route::post('/result-link/revoke/{id}', [ParentResultLinkController::class, 'destroy'])->name('parent.result.link.destroy');
 
 }); 
 

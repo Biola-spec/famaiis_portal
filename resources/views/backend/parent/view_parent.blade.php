@@ -37,6 +37,14 @@
                     @endforeach
                 </td>
 				<td>
+@php
+	$activeLink = $parent->resultLinks->first();
+@endphp
+@if($activeLink)
+	<a href="{{ $activeLink->shortUrl() }}" target="_blank" class="btn btn-success btn-sm">Results link</a>
+@else
+	<a href="{{ route('parent.edit',$parent->id) }}#results-link" class="btn btn-warning btn-sm">Results link</a>
+@endif
 <a href="{{ route('parent.edit',$parent->id) }}" class="btn btn-info">Edit</a>
 <a href="{{ route('parent.delete',$parent->id) }}" class="btn btn-danger" id="delete">Delete</a>
 				</td>

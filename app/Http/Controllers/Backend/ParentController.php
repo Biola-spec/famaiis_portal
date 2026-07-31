@@ -6,13 +6,17 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\Role;
+use App\Models\ParentResultLink;
+use App\Models\StudentYear;
 
 class ParentController extends Controller
 {
     public function ParentView()
     {
         $parentRole = Role::where('name', 'Parent')->first();
-        $allData = $parentRole ? $parentRole->users : collect();
+        $allData = $parentRole ? $parentRole->users()->with(['children', 'resultLinks' => function ($query) {
+            $query->where('is_active', true);
+        }])->get() : collect();
         return view('backend.parent.view_parent', compact('allData'));
     }
 
@@ -68,9 +72,16 @@ class ParentController extends Controller
 
     public function ParentEdit($id)
     {
-        $editData = User::findOrFail($id);
+        $editData = User::with('children')->findOrFail($id);
         $students = User::where('usertype', 'Student')->get();
-        return view('backend.parent.edit_parent', compact('editData', 'students'));
+        $activeLinks = ParentResultLink::query()
+            ->where('parent_id', $editData->id)
+            ->where('is_active', true)
+            ->latest()
+            ->get();
+        $sessions = StudentYear::orderByDesc('id')->get();
+
+        return view('backend.parent.edit_parent', compact('editData', 'students', 'activeLinks', 'sessions'));
     }
 
     public function ParentUpdate(Request $request, $id)
