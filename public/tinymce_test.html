@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TinyMCE Test</title>
+</head>
+<body>
+    <h1>TinyMCE Test</h1>
+    <textarea id="test-editor">Hello World</textarea>
+    
+    <script src="/tinymce_8.4.0/tinymce/js/tinymce/tinymce.min.js"></script>
+    <script>
+        console.log('Loading TinyMCE test...');
+        console.log('typeof tinymce:', typeof tinymce);
+        
+        if (typeof tinymce !== 'undefined') {
+            console.log('TinyMCE loaded, initializing...');
+            tinymce.init({
+                selector: '#test-editor',
+                plugins: ['lists', 'link'],
+                toolbar: 'bold italic | link',
+                height: 200
+            });
+        } else {
+            console.error('TinyMCE not loaded');
+        }
+    </script>
+</body>
+</html>

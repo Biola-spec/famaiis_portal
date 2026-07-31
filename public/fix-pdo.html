@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PHP PDO MySQL Driver Check</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .step { background: #f0f0f0; padding: 15px; margin: 10px 0; border-left: 4px solid #007bff; }
+        code { background: #e0e0e0; padding: 2px 6px; }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Fix PDO MySQL Driver Issue</h1>
+    
+    <?php
+    $extensions = get_loaded_extensions();
+    $hasPdoMysql = in_array('pdo_mysql', $extensions);
+    ?>
+    
+    <h2>Current Status:</h2>
+    <div class="step">
+        <?php if($hasPdoMysql): ?>
+            <p class="success">✅ PDO MySQL driver is ENABLED</p>
+        <?php else: ?>
+            <p class="error">❌ PDO MySQL driver is NOT ENABLED</p>
+        <?php endif; ?>
+    </div>
+
+    <h2>How to Fix (Choose ONE method):</h2>
+
+    <div class="step">
+        <h3>Method 1: Using Administrator PowerShell (Recommended)</h3>
+        <p><strong>Step 1:</strong> Open PowerShell as Administrator</p>
+        <p><strong>Step 2:</strong> Run this command:</p>
+        <code>(Get-Content "C:\Program Files\php-8.4.10-Win32-vs17-x64\php.ini") -replace '^;extension=pdo_mysql', 'extension=pdo_mysql' | Set-Content "C:\Program Files\php-8.4.10-Win32-vs17-x64\php.ini"</code>
+        <p><strong>Step 3:</strong> Restart the Laravel server:</p>
+        <code>Ctrl+C</code> (to stop), then <code>php artisan serve</code> (to start)
+    </div>
+
+    <div class="step">
+        <h3>Method 2: Manual Edit</h3>
+        <p><strong>Step 1:</strong> Open this file in Notepad as Administrator:</p>
+        <code>C:\Program Files\php-8.4.10-Win32-vs17-x64\php.ini</code>
+        <p><strong>Step 2:</strong> Find this line (around line 934):</p>
+        <code>;extension=pdo_mysql</code>
+        <p><strong>Step 3:</strong> Change it to (remove the semicolon):</p>
+        <code>extension=pdo_mysql</code>
+        <p><strong>Step 4:</strong> Save the file</p>
+        <p><strong>Step 5:</strong> Restart the Laravel server</p>
+    </div>
+
+    <div class="step">
+        <h3>Method 3: Use XAMPP's PHP Instead</h3>
+        <p><strong>Step 1:</strong> Enable PDO MySQL in XAMPP's php.ini:</p>
+        <code>C:\xampp\php\php.ini</code>
+        <p><strong>Step 2:</strong> Find and uncomment (remove ;):</p>
+        <code>extension=pdo_mysql</code>
+        <p><strong>Step 3:</strong> Use XAMPP's PHP to run the server:</p>
+        <code>C:\xampp\php\php.exe artisan serve</code>
+    </div>
+
+    <h2>Loaded Extensions:</h2>
+    <div class="step">
+        <?php echo implode(', ', $extensions); ?>
+    </div>
+
+    <h2>PHP Info:</h2>
+    <div class="step">
+        <p><strong>PHP Version:</strong> <?php echo phpversion(); ?></p>
+        <p><strong>PHP INI File:</strong> <?php echo php_ini_loaded_file(); ?></p>
+    </div>
+</body>
+</html>

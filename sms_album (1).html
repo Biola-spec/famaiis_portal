@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SMS Achievement Album</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=Cormorant+Garamond:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #7eb8e8;
+    --gold-light: #b8daff;
+    --gold-dark: #3a7ab5;
+    --cream: #e8f4fd;
+    --deep: #050d1a;
+    --burgundy: #0a2040;
+    --shadow: rgba(0,0,0,0.7);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--deep);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Cormorant Garamond', serif;
+    overflow-x: hidden;
+    background-image:
+      radial-gradient(ellipse at 20% 50%, rgba(30,80,160,0.15) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 20%, rgba(10,40,100,0.2) 0%, transparent 50%);
+  }
+
+  /* ── Header ── */
+  .album-header {
+    text-align: center;
+    padding: 40px 20px 20px;
+    position: relative;
+    z-index: 10;
+  }
+  .album-header .school-crest {
+    font-size: 3rem;
+    margin-bottom: 8px;
+    filter: drop-shadow(0 0 12px var(--gold));
+  }
+  .album-header h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(1.8rem, 4vw, 3rem);
+    color: var(--gold);
+    letter-spacing: 0.12em;
+    text-shadow: 0 0 30px rgba(126,184,232,0.5);
+    line-height: 1.1;
+  }
+  .album-header .subtitle {
+    font-size: 1rem;
+    color: rgba(201,168,76,0.6);
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    margin-top: 6px;
+  }
+
+  /* ── Gold divider ── */
+  .divider {
+    width: 200px;
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--gold), transparent);
+    margin: 16px auto;
+    position: relative;
+  }
+  .divider::before {
+    content: '✦';
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--gold);
+    font-size: 0.7rem;
+    background: var(--deep);
+    padding: 0 6px;
+  }
+
+  /* ── 3D Stage ── */
+  .stage {
+    perspective: 1100px;
+    perspective-origin: 50% 40%;
+    width: 100%;
+    max-width: 860px;
+    height: 500px;
+    position: relative;
+    margin: 10px auto;
+    cursor: grab;
+  }
+  .stage:active { cursor: grabbing; }
+
+  .carousel {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transform-style: preserve-3d;
+    transition: transform 0.85s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    transform-origin: center center;
+  }
+
+  /* ── Cards ── */
+  .card {
+    position: absolute;
+    width: 260px;
+    height: 360px;
+    left: 50%;
+    top: 50%;
+    margin-left: -130px;
+    margin-top: -180px;
+    border-radius: 4px;
+    transform-style: preserve-3d;
+    transition: all 0.85s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    cursor: pointer;
+  }
+
+  .card-inner {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transform-style: preserve-3d;
+    transition: transform 0.7s ease;
+    border-radius: 4px;
+  }
+
+  .card:hover .card-inner {
+    transform: rotateY(180deg);
+  }
+
+  .card-front, .card-back {
+    position: absolute;
+    inset: 0;
+    border-radius: 4px;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    overflow: hidden;
+    box-shadow:
+      0 20px 60px rgba(0,0,0,0.8),
+      0 0 0 1px rgba(126,184,232,0.2),
+      inset 0 1px 0 rgba(126,184,232,0.3);
+  }
+
+  .card-front {
+    background: #071428;
+  }
+
+  .card-back {
+    background: linear-gradient(160deg, #071428 0%, #0d1f3c 100%);
+    transform: rotateY(180deg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 20px;
+    border: 1px solid rgba(126,184,232,0.3);
+  }
+
+  /* ── Photo frame ── */
+  .photo-frame {
+    width: 100%;
+    height: 220px;
+    position: relative;
+    overflow: hidden;
+    background: #030a14;
+  }
+
+  .photo-frame img,
+  .photo-placeholder {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    filter: sepia(10%) contrast(1.05);
+    transition: transform 0.4s ease;
+  }
+
+  .card-front:hover .photo-placeholder,
+  .card-front:hover img {
+    transform: scale(1.05);
+  }
+
+  .photo-placeholder {
+    background: linear-gradient(135deg, #071428 0%, #0f2a4a 50%, #071428 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 4rem;
+    opacity: 0.7;
+  }
+
+  /* Gold corner ornaments */
+  .frame-corner {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    border-color: var(--gold);
+    border-style: solid;
+    opacity: 0.7;
+    pointer-events: none;
+  }
+  .frame-corner.tl { top: 6px; left: 6px; border-width: 2px 0 0 2px; }
+  .frame-corner.tr { top: 6px; right: 6px; border-width: 2px 2px 0 0; }
+  .frame-corner.bl { bottom: 6px; left: 6px; border-width: 0 0 2px 2px; }
+  .frame-corner.br { bottom: 6px; right: 6px; border-width: 0 2px 2px 0; }
+
+  /* ── Card label area ── */
+  .card-label {
+    padding: 16px 18px 14px;
+    background: linear-gradient(180deg, #071428 0%, #0d1f3c 100%);
+    flex: 1;
+    position: relative;
+  }
+  .card-label::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 18px; right: 18px;
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--gold-dark), transparent);
+  }
+  .card-label .tag {
+    font-size: 0.6rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--gold-dark);
+    margin-bottom: 5px;
+  }
+  .card-label h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.05rem;
+    color: var(--gold-light);
+    line-height: 1.2;
+    margin-bottom: 6px;
+  }
+  .card-label p {
+    font-size: 0.78rem;
+    color: rgba(126,184,232,0.55);
+    line-height: 1.5;
+  }
+
+  /* ── Back of card ── */
+  .card-back .back-ornament {
+    font-size: 2rem;
+    color: var(--gold);
+    margin-bottom: 12px;
+    filter: drop-shadow(0 0 8px rgba(126,184,232,0.5));
+  }
+  .card-back h4 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem;
+    color: var(--gold);
+    margin-bottom: 12px;
+    text-align: center;
+  }
+  .card-back p {
+    font-size: 0.82rem;
+    color: rgba(184,218,255,0.7);
+    text-align: center;
+    line-height: 1.7;
+  }
+  .card-back .back-year {
+    margin-top: 16px;
+    font-size: 1.8rem;
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    color: rgba(126,184,232,0.3);
+  }
+  .card-back .divider-mini {
+    width: 60px;
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--gold-dark), transparent);
+    margin: 10px auto;
+  }
+
+  /* ── Active glow ── */
+  .card.active .card-inner {
+    filter: drop-shadow(0 0 20px rgba(126,184,232,0.45));
+  }
+
+  /* ── Controls ── */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 18px 0 12px;
+    position: relative;
+    z-index: 10;
+  }
+
+  .btn {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    border: 1px solid rgba(126,184,232,0.4);
+    background: rgba(126,184,232,0.08);
+    color: var(--gold);
+    font-size: 1.1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.25s;
+    backdrop-filter: blur(4px);
+  }
+  .btn:hover {
+    background: rgba(126,184,232,0.2);
+    border-color: var(--gold);
+    box-shadow: 0 0 18px rgba(126,184,232,0.35);
+    transform: scale(1.08);
+  }
+  .btn:active { transform: scale(0.96); }
+
+  .page-indicator {
+    font-size: 0.75rem;
+    color: rgba(126,184,232,0.5);
+    letter-spacing: 0.2em;
+    min-width: 60px;
+    text-align: center;
+  }
+
+  /* ── Dot nav ── */
+  .dot-nav {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    padding-bottom: 30px;
+    position: relative;
+    z-index: 10;
+  }
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(201,168,76,0.25);
+    cursor: pointer;
+    transition: all 0.3s;
+    border: 1px solid transparent;
+  }
+  .dot.active {
+    background: var(--gold);
+    box-shadow: 0 0 8px rgba(126,184,232,0.7);
+    border-color: var(--gold-light);
+  }
+
+  /* ── Instruction hint ── */
+  .hint {
+    font-size: 0.68rem;
+    color: rgba(126,184,232,0.3);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    text-align: center;
+    padding-bottom: 8px;
+  }
+
+  /* ── Floating particles ── */
+  .particles {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 0;
+  }
+  .particle {
+    position: absolute;
+    width: 2px;
+    height: 2px;
+    background: #7eb8e8;
+    border-radius: 50%;
+    opacity: 0;
+    animation: float-up linear infinite;
+  }
+  @keyframes float-up {
+    0%   { opacity: 0; transform: translateY(0) scale(0); }
+    10%  { opacity: 0.6; }
+    90%  { opacity: 0.2; }
+    100% { opacity: 0; transform: translateY(-100vh) scale(1.5); }
+  }
+</style>
+</head>
+<body>
+
+<!-- Particles -->
+<div class="particles" id="particles"></div>
+
+<!-- Header -->
+<div class="album-header">
+  <div class="school-crest">🏫</div>
+  <h1>S.M.S. Achievement Album</h1>
+  <p class="subtitle">Memories &amp; Milestones</p>
+  <div class="divider"></div>
+</div>
+
+<!-- 3D Carousel Stage -->
+<div class="stage" id="stage">
+  <div class="carousel" id="carousel">
+    <!-- Cards injected by JS -->
+  </div>
+</div>
+
+<p class="hint">Hover a card to flip · Drag or use arrows to spin</p>
+
+<!-- Controls -->
+<div class="controls">
+  <button class="btn" id="prevBtn">&#8592;</button>
+  <span class="page-indicator" id="pageIndicator">1 / 8</span>
+  <button class="btn" id="nextBtn">&#8594;</button>
+</div>
+
+<!-- Dot nav -->
+<div class="dot-nav" id="dotNav"></div>
+
+<script>
+const CARDS = [
+  {
+    emoji: '🎓',
+    tag: 'Academic Excellence',
+    title: 'Top of the Class',
+    desc: 'Recognised for outstanding academic performance across all subjects.',
+    backTitle: 'Valedictorian Award',
+    backDesc: 'Awarded to the student who achieved the highest GPA in the graduating class, demonstrating remarkable dedication to scholarship.',
+    year: '2024',
+    accent: '#c9a84c'
+  },
+  {
+    emoji: '⚽',
+    tag: 'Sports & Athletics',
+    title: 'Inter-School Champions',
+    desc: 'Football team claimed the regional championship trophy after an unbeaten season.',
+    backTitle: 'Champions Trophy',
+    backDesc: 'Undefeated in 12 matches, the SMS Lions brought home the Regional Schools Cup for the third consecutive year.',
+    year: '2024',
+    accent: '#4c9ac9'
+  },
+  {
+    emoji: '🎭',
+    tag: 'Arts & Culture',
+    title: 'Annual Drama Night',
+    desc: 'A sold-out performance celebrating student creativity and theatrical talent.',
+    backTitle: 'Best Production',
+    backDesc: 'The performing arts ensemble staged a breathtaking original production, earning a standing ovation and a Best School Drama award.',
+    year: '2023',
+    accent: '#c94c6e'
+  },
+  {
+    emoji: '🔬',
+    tag: 'Science & Innovation',
+    title: 'Science Fair Winners',
+    desc: 'Students showcased groundbreaking projects in biology, chemistry and physics.',
+    backTitle: 'National Science Fair',
+    backDesc: 'Three SMS teams advanced to the national finals, with Team Alpha winning Gold for their water purification research.',
+    year: '2024',
+    accent: '#4cc9a8'
+  },
+  {
+    emoji: '📚',
+    tag: 'Class of 2024',
+    title: 'Graduation Day',
+    desc: 'A proud milestone as our students step forward into their bright futures.',
+    backTitle: 'Class of 2024',
+    backDesc: '98% pass rate. 40 distinctions. 12 scholarships awarded. The Class of 2024 leaves a legacy of excellence.',
+    year: '2024',
+    accent: '#c9a84c'
+  },
+  {
+    emoji: '🎵',
+    tag: 'Music & Performance',
+    title: 'School Band Showcase',
+    desc: 'The SMS ensemble dazzled audiences with performances across genres.',
+    backTitle: 'Silver Medal — Nationals',
+    backDesc: 'Competing against 30 schools, the SMS Concert Band earned a Silver Medal at the National Schools Music Festival.',
+    year: '2023',
+    accent: '#a84cc9'
+  },
+  {
+    emoji: '🏆',
+    tag: 'Leadership',
+    title: 'Student Council',
+    desc: 'Dedicated student leaders driving positive change within the school community.',
+    backTitle: 'Community Service Award',
+    backDesc: 'The SMS Student Council logged over 500 volunteer hours, earning the District Community Champion Award.',
+    year: '2024',
+    accent: '#c97a4c'
+  },
+  {
+    emoji: '✍️',
+    tag: 'Literacy & Writing',
+    title: 'Creative Writing Prize',
+    desc: 'Celebrating the voices of young writers who bring stories to life on the page.',
+    backTitle: 'Published Authors',
+    backDesc: 'Four SMS students had their short stories published in the Young Writers Anthology, a first in school history.',
+    year: '2024',
+    accent: '#6ec94c'
+  }
+];
+
+const N = CARDS.length;
+const RADIUS = 400;
+let currentIndex = 0;
+let isDragging = false;
+let startX = 0;
+let startAngle = 0;
+let currentAngle = 0;
+
+const carousel = document.getElementById('carousel');
+const dotNav = document.getElementById('dotNav');
+const pageIndicator = document.getElementById('pageIndicator');
+
+// Build cards
+CARDS.forEach((data, i) => {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.dataset.index = i;
+
+  card.innerHTML = `
+    <div class="card-inner">
+      <div class="card-front">
+        <div class="photo-frame">
+          <div class="photo-placeholder">${data.emoji}</div>
+          <div class="frame-corner tl"></div>
+          <div class="frame-corner tr"></div>
+          <div class="frame-corner bl"></div>
+          <div class="frame-corner br"></div>
+        </div>
+        <div class="card-label">
+          <div class="tag">${data.tag}</div>
+          <h3>${data.title}</h3>
+          <p>${data.desc}</p>
+        </div>
+      </div>
+      <div class="card-back">
+        <div class="back-ornament">✦</div>
+        <h4>${data.backTitle}</h4>
+        <div class="divider-mini"></div>
+        <p>${data.backDesc}</p>
+        <div class="back-year">${data.year}</div>
+      </div>
+    </div>
+  `;
+
+  card.addEventListener('click', () => {
+    goTo(i);
+  });
+
+  carousel.appendChild(card);
+});
+
+// Build dots
+CARDS.forEach((_, i) => {
+  const dot = document.createElement('div');
+  dot.className = 'dot' + (i === 0 ? ' active' : '');
+  dot.addEventListener('click', () => goTo(i));
+  dotNav.appendChild(dot);
+});
+
+function positionCards(angle) {
+  const cards = carousel.querySelectorAll('.card');
+  cards.forEach((card, i) => {
+    const theta = (2 * Math.PI * i / N) + (angle * Math.PI / 180);
+    const x = Math.sin(theta) * RADIUS;
+    const z = Math.cos(theta) * RADIUS;
+    const rotY = -theta * 180 / Math.PI;
+
+    card.style.transform = `translateX(${x}px) translateZ(${z}px) rotateY(${rotY}deg)`;
+
+    // Fade out cards that are behind
+    const cosVal = Math.cos(theta);
+    const opacity = cosVal > 0 ? 0.2 + 0.8 * Math.pow(cosVal, 2) : 0.15;
+    card.style.opacity = opacity;
+    card.style.zIndex = Math.round(cosVal * 100 + 100);
+
+    // Mark the front card
+    card.classList.toggle('active', i === currentIndex);
+  });
+}
+
+function goTo(index) {
+  currentIndex = ((index % N) + N) % N;
+  currentAngle = -(currentIndex / N) * 360;
+  positionCards(currentAngle);
+  updateUI();
+}
+
+function updateUI() {
+  const dots = dotNav.querySelectorAll('.dot');
+  dots.forEach((d, i) => d.classList.toggle('active', i === currentIndex));
+  pageIndicator.textContent = `${currentIndex + 1} / ${N}`;
+}
+
+// Init
+positionCards(0);
+updateUI();
+
+// Arrow buttons
+document.getElementById('prevBtn').addEventListener('click', () => goTo(currentIndex - 1));
+document.getElementById('nextBtn').addEventListener('click', () => goTo(currentIndex + 1));
+
+// Keyboard
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft') goTo(currentIndex - 1);
+  if (e.key === 'ArrowRight') goTo(currentIndex + 1);
+});
+
+// Drag
+const stage = document.getElementById('stage');
+
+stage.addEventListener('mousedown', e => {
+  isDragging = true;
+  startX = e.clientX;
+  startAngle = currentAngle;
+});
+
+document.addEventListener('mousemove', e => {
+  if (!isDragging) return;
+  const dx = e.clientX - startX;
+  const drag = startAngle + dx * 0.25;
+  positionCards(drag);
+});
+
+document.addEventListener('mouseup', e => {
+  if (!isDragging) return;
+  isDragging = false;
+  const dx = e.clientX - startX;
+  const delta = Math.round(dx * 0.25 / (360 / N));
+  goTo(currentIndex - delta);
+});
+
+// Touch
+stage.addEventListener('touchstart', e => {
+  startX = e.touches[0].clientX;
+  startAngle = currentAngle;
+}, { passive: true });
+
+stage.addEventListener('touchmove', e => {
+  const dx = e.touches[0].clientX - startX;
+  positionCards(startAngle + dx * 0.25);
+}, { passive: true });
+
+stage.addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - startX;
+  const delta = Math.round(dx * 0.25 / (360 / N));
+  goTo(currentIndex - delta);
+});
+
+// Floating particles
+const particleContainer = document.getElementById('particles');
+for (let i = 0; i < 30; i++) {
+  const p = document.createElement('div');
+  p.className = 'particle';
+  p.style.left = Math.random() * 100 + 'vw';
+  p.style.animationDuration = (8 + Math.random() * 16) + 's';
+  p.style.animationDelay = (Math.random() * 20) + 's';
+  p.style.width = p.style.height = (1 + Math.random() * 3) + 'px';
+  particleContainer.appendChild(p);
+}
+</script>
+</body>
+</html>
