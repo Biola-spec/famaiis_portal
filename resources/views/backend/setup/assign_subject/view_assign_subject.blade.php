@@ -60,6 +60,48 @@
 			  </div>
 			  <!-- /.box -->
 
+			 <div class="box">
+				<div class="box-header with-border">
+				  <h3 class="box-title">Teacher Subject & Class Overview</h3>
+				</div>
+				<div class="box-body">
+					<div class="table-responsive">
+					  <table id="teacherAssignmentOverview" class="table table-bordered table-striped">
+						<thead>
+			<tr>
+				<th width="5%">SL</th>
+				<th>Teacher</th>
+				<th>Subject</th>
+				<th>Class</th>
+				<th>Section</th>
+				<th>Full Mark</th>
+				<th>Pass Mark</th>
+				<th>Subjective Mark</th>
+			</tr>
+		</thead>
+		<tbody>
+			@forelse($allAssignments as $key => $assignment)
+			<tr>
+				<td>{{ $key+1 }}</td>
+				<td>{{ $assignment->teacher->name ?? 'Not Assigned' }}</td>
+				<td>{{ $assignment->school_subject->name ?? 'N/A' }}</td>
+				<td>{{ $assignment->student_class->name ?? 'N/A' }}</td>
+				<td>{{ $assignment->section->name ?? 'All Sections' }}</td>
+				<td>{{ $assignment->full_mark }}</td>
+				<td>{{ $assignment->pass_mark }}</td>
+				<td>{{ $assignment->subjective_mark }}</td>
+			</tr>
+			@empty
+			<tr>
+				<td colspan="8" class="text-center">No subject assignments found.</td>
+			</tr>
+			@endforelse
+		</tbody>
+					  </table>
+					</div>
+				</div>
+			  </div>
+
 			       
 			</div>
 			<!-- /.col -->

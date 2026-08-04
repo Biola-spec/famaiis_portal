@@ -10,8 +10,10 @@ use App\Models\StudentMarks;
 use App\Models\StudentYear;
 use App\Models\User;
 use App\Services\ReportCardService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 class ParentResultLinkController extends Controller
 {
@@ -26,9 +28,10 @@ class ParentResultLinkController extends Controller
             'year_id' => 'nullable|exists:student_years,id',
             'term' => 'nullable|in:1st Term,2nd Term,3rd Term',
             'expires_in_days' => 'nullable|integer|min:1|max:365',
+            'redirect_to' => 'nullable|in:parent_list,parent_edit',
         ]);
 
-        $childIds = $parent->children()->pluck('id')->all();
+        $childIds = $parent->children()->pluck('users.id')->all();
         if (empty($childIds)) {
             return back()->with([
                 'message' => 'Link this parent to at least one student before creating a results link.',
@@ -64,14 +67,19 @@ class ParentResultLinkController extends Controller
             'is_active' => true,
         ]);
 
-        return redirect()
+        $redirect = redirect()
             ->route('parent.edit', $parent->id)
-            ->withFragment('results-link')
-            ->with([
-                'message' => 'Results link created.',
-                'alert-type' => 'success',
-                'parent_result_link' => $link->shortUrl(),
-            ]);
+            ->withFragment('results-link');
+
+        if (($validated['redirect_to'] ?? null) === 'parent_list') {
+            $redirect = redirect()->route('parent.view');
+        }
+
+        return $redirect->with([
+            'message' => 'Results link created: '.$link->shortUrl(),
+            'alert-type' => 'success',
+            'parent_result_link' => $link->shortUrl(),
+        ]);
     }
 
     public function destroy(int $id)
@@ -185,12 +193,23 @@ class ParentResultLinkController extends Controller
 
         $link->recordAccess();
 
-        return $reportCardService->render(
+        $reportCard = $reportCardService->render(
             $yearId,
             (int) $sample->class_id,
             $sample->section_id ? (int) $sample->section_id : null,
             $term,
-            (string) $student->id_no
+            (string) $student->id_no,
+            true
         );
+
+        if (!method_exists($reportCard, 'render')) {
+            return $reportCard;
+        }
+
+        $filename = Str::slug($student->name.'-'.$term.'-report-card').'.pdf';
+
+        return Pdf::loadHTML($reportCard->render())
+            ->setPaper('a4', 'portrait')
+            ->download($filename);
     }
 }

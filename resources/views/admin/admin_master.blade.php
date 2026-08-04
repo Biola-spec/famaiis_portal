@@ -71,6 +71,18 @@
             --danger-light: #FDEAEA;       /* Red Tint */
             --info-color: #2E86DE;         /* Sky Blue */
             --info-light: #E8F2FC;         /* Sky Blue Tint */
+            --teal-color: #0f766e;
+            --teal-light: #ccfbf1;
+            --indigo-color: #4f46e5;
+            --indigo-light: #e0e7ff;
+            --emerald-color: #059669;
+            --emerald-light: #d1fae5;
+            --amber-color: #d97706;
+            --amber-light: #fef3c7;
+            --pink-color: #db2777;
+            --pink-light: #fce7f3;
+            --cyan-color: #0891b2;
+            --cyan-light: #cffafe;
 
             background-color: var(--bg-body) !important;
             color: var(--text-main) !important;
@@ -94,6 +106,18 @@
             --danger-light: rgba(248, 113, 113, 0.15);
             --info-color: #38bdf8;
             --info-light: rgba(56, 189, 248, 0.15);
+            --teal-color: #2dd4bf;
+            --teal-light: rgba(45, 212, 191, 0.15);
+            --indigo-color: #818cf8;
+            --indigo-light: rgba(129, 140, 248, 0.15);
+            --emerald-color: #34d399;
+            --emerald-light: rgba(52, 211, 153, 0.15);
+            --amber-color: #fbbf24;
+            --amber-light: rgba(251, 191, 36, 0.15);
+            --pink-color: #f472b6;
+            --pink-light: rgba(244, 114, 182, 0.15);
+            --cyan-color: #22d3ee;
+            --cyan-light: rgba(34, 211, 238, 0.15);
 
             background-color: var(--bg-body) !important;
             color: var(--text-main) !important;
@@ -362,6 +386,121 @@
         }
         .stat-card-info .stat-icon-box i {
             color: var(--info-color) !important;
+        }
+
+        @media (min-width: 1200px) {
+            .dashboard-stat-col {
+                flex: 0 0 20%;
+                max-width: 20%;
+            }
+        }
+
+        .stat-card-teal .stat-icon-box { background-color: var(--teal-light) !important; }
+        .stat-card-teal .stat-icon-box i { color: var(--teal-color) !important; }
+        .stat-card-indigo .stat-icon-box { background-color: var(--indigo-light) !important; }
+        .stat-card-indigo .stat-icon-box i { color: var(--indigo-color) !important; }
+        .stat-card-emerald .stat-icon-box { background-color: var(--emerald-light) !important; }
+        .stat-card-emerald .stat-icon-box i { color: var(--emerald-color) !important; }
+        .stat-card-amber .stat-icon-box { background-color: var(--amber-light) !important; }
+        .stat-card-amber .stat-icon-box i { color: var(--amber-color) !important; }
+        .stat-card-pink .stat-icon-box { background-color: var(--pink-light) !important; }
+        .stat-card-pink .stat-icon-box i { color: var(--pink-color) !important; }
+        .stat-card-cyan .stat-icon-box { background-color: var(--cyan-light) !important; }
+        .stat-card-cyan .stat-icon-box i { color: var(--cyan-color) !important; }
+
+        .dashboard-compact-table {
+            max-height: 18rem;
+            overflow: auto;
+        }
+
+        .dashboard-compact-table .table th,
+        .dashboard-compact-table .table td {
+            padding: 0.55rem 0.75rem !important;
+        }
+
+        .dashboard-student-avatar {
+            width: 32px;
+            height: 32px;
+            object-fit: cover;
+        }
+
+        .dashboard-chart-wrap {
+            min-height: 210px;
+            position: relative;
+        }
+
+        .dashboard-chart-panel {
+            background:
+                linear-gradient(135deg, rgba(129, 140, 248, 0.10), rgba(34, 211, 238, 0.06)),
+                var(--card-bg) !important;
+        }
+
+        .dashboard-chart-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 16px;
+        }
+
+        .dashboard-chart-card {
+            min-height: 280px;
+            padding: 16px;
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+
+        .dashboard-chart-card h5 {
+            color: var(--heading-color) !important;
+            font-size: 13px !important;
+            margin-bottom: 12px;
+        }
+
+        .dashboard-insight-strip {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .dashboard-insight {
+            border-radius: 12px;
+            padding: 12px;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .dashboard-insight span {
+            display: block;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.7px;
+            text-transform: uppercase;
+            opacity: 0.82;
+        }
+
+        .dashboard-insight strong {
+            display: block;
+            font-size: 20px;
+            line-height: 1.15;
+            margin-top: 5px;
+        }
+
+        .dashboard-insight-purple { background: linear-gradient(135deg, #7c3aed, #ec4899); }
+        .dashboard-insight-cyan { background: linear-gradient(135deg, #0891b2, #22d3ee); }
+        .dashboard-insight-amber { background: linear-gradient(135deg, #d97706, #facc15); }
+        .dashboard-insight-green { background: linear-gradient(135deg, #059669, #84cc16); }
+
+        @media (max-width: 991px) {
+            .dashboard-chart-grid,
+            .dashboard-insight-strip {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (min-width: 992px) and (max-width: 1399px) {
+            .dashboard-chart-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
         }
 
         /* Button & Form Overrides */
@@ -707,6 +846,7 @@
         .light-skin h6, .light-skin .h6 {
             color: var(--heading-color) !important;
         }
+
     </style>
 
     <script>

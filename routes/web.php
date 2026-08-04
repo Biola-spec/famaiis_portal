@@ -363,6 +363,7 @@ Route::get('designation/delete/{id}', [DesignationController::class, 'Designatio
 Route::prefix('students')->middleware('permission:view_students')->group(function(){
 
 Route::get('/reg/view', [StudentRegController::class, 'StudentRegView'])->name('student.registration.view');
+Route::get('/reg/live-search', [StudentRegController::class, 'StudentRegLiveSearch'])->name('student.registration.live-search');
 
 Route::get('/reg/Add', [StudentRegController::class, 'StudentRegAdd'])->name('student.registration.add');
 
@@ -844,4 +845,3 @@ Route::middleware(['auth', 'role:Admin,Accountant'])->prefix('setting')->group(f
 
 // Chat Route
 Route::middleware(['auth'])->get('/chat', \App\Livewire\Chat\Chat::class)->name('chat.view');
-

@@ -22,8 +22,30 @@ class ParentController extends Controller
 
     public function ParentAdd()
     {
-        $students = User::where('usertype', 'Student')->get();
-        return view('backend.parent.add_parent', compact('students'));
+        $students = User::where('usertype', 'Student')
+            ->with(['studentClassAssignments.student_class'])
+            ->get();
+
+        foreach ($students as $student) {
+            $latestAssignment = $student->studentClassAssignments->sortByDesc('id')->first();
+            $student->class_name = $latestAssignment && $latestAssignment->student_class 
+                ? $latestAssignment->student_class->name 
+                : 'No Assigned Class';
+        }
+
+        $students = $students->sortBy([
+            ['class_name', 'asc'],
+            ['name', 'asc']
+        ]);
+
+        $groupedStudents = $students->groupBy('class_name');
+
+        if ($groupedStudents->has('No Assigned Class')) {
+            $noClassGroup = $groupedStudents->pull('No Assigned Class');
+            $groupedStudents->put('No Assigned Class', $noClassGroup);
+        }
+
+        return view('backend.parent.add_parent', compact('groupedStudents'));
     }
 
     public function ParentStore(Request $request)
@@ -58,9 +80,7 @@ class ParentController extends Controller
         }
 
         // Link child
-        if ($request->student_id) {
-            $data->children()->sync($request->student_id);
-        }
+        $data->children()->sync($request->student_id ?? []);
 
         $notification = array(
             'message' => 'Parent Inserted Successfully',
@@ -72,8 +92,30 @@ class ParentController extends Controller
 
     public function ParentEdit($id)
     {
-        $editData = User::with('children')->findOrFail($id);
-        $students = User::where('usertype', 'Student')->get();
+        $editData = User::with('children.studentClassAssignments.student_class')->findOrFail($id);
+        $students = User::where('usertype', 'Student')
+            ->with(['studentClassAssignments.student_class'])
+            ->get();
+
+        foreach ($students as $student) {
+            $latestAssignment = $student->studentClassAssignments->sortByDesc('id')->first();
+            $student->class_name = $latestAssignment && $latestAssignment->student_class 
+                ? $latestAssignment->student_class->name 
+                : 'No Assigned Class';
+        }
+
+        $students = $students->sortBy([
+            ['class_name', 'asc'],
+            ['name', 'asc']
+        ]);
+
+        $groupedStudents = $students->groupBy('class_name');
+
+        if ($groupedStudents->has('No Assigned Class')) {
+            $noClassGroup = $groupedStudents->pull('No Assigned Class');
+            $groupedStudents->put('No Assigned Class', $noClassGroup);
+        }
+
         $activeLinks = ParentResultLink::query()
             ->where('parent_id', $editData->id)
             ->where('is_active', true)
@@ -81,7 +123,7 @@ class ParentController extends Controller
             ->get();
         $sessions = StudentYear::orderByDesc('id')->get();
 
-        return view('backend.parent.edit_parent', compact('editData', 'students', 'activeLinks', 'sessions'));
+        return view('backend.parent.edit_parent', compact('editData', 'groupedStudents', 'activeLinks', 'sessions'));
     }
 
     public function ParentUpdate(Request $request, $id)
@@ -103,9 +145,7 @@ class ParentController extends Controller
         }
         $data->save();
 
-        if ($request->student_id) {
-            $data->children()->sync($request->student_id);
-        }
+        $data->children()->sync($request->student_id ?? []);
 
         $notification = array(
             'message' => 'Parent Updated Successfully',

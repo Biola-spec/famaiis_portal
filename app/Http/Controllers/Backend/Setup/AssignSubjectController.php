@@ -8,12 +8,17 @@ use App\Models\SchoolSubject;
 use App\Models\StudentClass; 
 use App\Models\SchoolSection;
 use App\Models\AssignSubject;
+use App\Models\TeacherAssignment;
 use App\Models\User;
 
 class AssignSubjectController extends Controller
 {
     public function ViewAssignSubject(){
         $data['allData'] = AssignSubject::with(['student_class', 'section'])->select('class_id', 'section_id')->groupBy('class_id', 'section_id')->get();
+        $data['allAssignments'] = AssignSubject::with(['student_class', 'section', 'school_subject', 'teacher'])
+            ->orderBy('class_id')
+            ->orderBy('subject_id')
+            ->get();
     	return view('backend.setup.assign_subject.view_assign_subject',$data);
     }
 
@@ -55,15 +60,7 @@ class AssignSubjectController extends Controller
 	    	$subjectCount = count($request->subject_id);
 	    	if ($subjectCount !=NULL) {
 	    		for ($i=0; $i <$subjectCount ; $i++) { 
-	    			$assign_subject = new AssignSubject();
-	    			$assign_subject->class_id = is_array($request->class_id) ? $request->class_id[$i] : $request->class_id;
-                    $assign_subject->section_id = $request->section_id;
-	    			$assign_subject->subject_id = $request->subject_id[$i];
-                    $assign_subject->teacher_id = $request->teacher_id[$i];
-	    			$assign_subject->full_mark = $request->full_mark[$i] ?? 0;
-	    			$assign_subject->pass_mark = $request->pass_mark[$i] ?? 0;
-	    			$assign_subject->subjective_mark = $request->subjective_mark[$i] ?? 0;
-	    			$assign_subject->save();
+                    $this->saveAssignmentRow($request, $i);
 
 	    		} // End For Loop
 	    	}// End If Condition
@@ -115,22 +112,9 @@ public function UpdateAssignSubject(Request $request,$class_id){
     	}else{
     		 
     $countClass = count($request->subject_id);
-    if ($request->section_id) {
-        AssignSubject::where('class_id',$class_id)->where('section_id', $request->section_id)->delete(); 
-    } else {
-        AssignSubject::where('class_id',$class_id)->whereNull('section_id')->delete(); 
-    }
 	
     		for ($i=0; $i <$countClass ; $i++) { 
-    			$assign_subject = new AssignSubject();
-	    			$assign_subject->class_id = $request->class_id;
-                    $assign_subject->section_id = $request->section_id;
-	    			$assign_subject->subject_id = $request->subject_id[$i];
-                    $assign_subject->teacher_id = $request->teacher_id[$i];
-	    			$assign_subject->full_mark = $request->full_mark[$i];
-	    			$assign_subject->pass_mark = $request->pass_mark[$i];
-	    			$assign_subject->subjective_mark = $request->subjective_mark[$i];
-	    			$assign_subject->save();
+                $this->saveAssignmentRow($request, $i, $request->class_id);
 
     		} // End For Loop	 
 
@@ -165,6 +149,56 @@ public function UpdateAssignSubject(Request $request,$class_id){
                     $q->where('name', 'Teacher');
                 });
         });
+    }
+
+    private function saveAssignmentRow(Request $request, int $index, $defaultClassId = null): void
+    {
+        $classId = is_array($request->class_id) ? $request->class_id[$index] : ($defaultClassId ?? $request->class_id);
+        $subjectId = $request->subject_id[$index] ?? null;
+        $teacherId = $request->teacher_id[$index] ?? null;
+
+        if (!$classId || !$subjectId || !$teacherId) {
+            return;
+        }
+
+        $existingAssignment = AssignSubject::where('class_id', $classId)
+            ->where('subject_id', $subjectId)
+            ->when($request->section_id, function ($query) use ($request) {
+                $query->where('section_id', $request->section_id);
+            }, function ($query) {
+                $query->whereNull('section_id');
+            })
+            ->first();
+
+        if ($existingAssignment && $existingAssignment->teacher_id && (int) $existingAssignment->teacher_id !== (int) $teacherId) {
+            TeacherAssignment::where('teacher_id', $existingAssignment->teacher_id)
+                ->where('class_id', $classId)
+                ->where('subject_id', $subjectId)
+                ->delete();
+        }
+
+        AssignSubject::updateOrCreate(
+            [
+                'class_id' => $classId,
+                'section_id' => $request->section_id,
+                'subject_id' => $subjectId,
+            ],
+            [
+                'teacher_id' => $teacherId,
+                'full_mark' => $request->full_mark[$index] ?? 0,
+                'pass_mark' => $request->pass_mark[$index] ?? 0,
+                'subjective_mark' => $request->subjective_mark[$index] ?? 0,
+            ]
+        );
+
+        TeacherAssignment::updateOrCreate(
+            [
+                'teacher_id' => $teacherId,
+                'class_id' => $classId,
+                'subject_id' => $subjectId,
+            ],
+            []
+        );
     }
 
 

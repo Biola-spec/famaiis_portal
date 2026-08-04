@@ -68,7 +68,7 @@ class ParentResultLink extends Model
 
     public function shortUrl(): string
     {
-        return url('/r/'.$this->token);
+        return route('parent.result.link', $this->token);
     }
 
     public static function generateUniqueToken(): string
@@ -93,7 +93,7 @@ class ParentResultLink extends Model
 
     public function allowedStudentIds(): array
     {
-        return $this->parent?->children()->pluck('id')->all() ?? [];
+        return $this->parent?->children()->pluck('users.id')->all() ?? [];
     }
 
     public function resolveStudentId(?int $requestedStudentId = null): ?int

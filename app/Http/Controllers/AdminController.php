@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Auth;
 use App\Models\User;
-use App\Models\EmployeeAttendance;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class AdminController extends Controller
 {
@@ -66,23 +68,57 @@ class AdminController extends Controller
         }
 
         // Admin Dashboard Logic
-        $data['total_student'] = User::where('usertype', 'student')->count();
-        $data['total_teacher'] = User::where('usertype', 'Employee')->count();
-        $data['total_parent'] = User::where('usertype', 'Parent')->count();
+        $data['total_student'] = $this->safeCount(function () {
+            return User::whereIn(DB::raw('LOWER(usertype)'), ['student'])->count();
+        });
+        $data['total_teacher'] = $this->safeCount(function () {
+            return User::whereIn(DB::raw('LOWER(usertype)'), ['employee', 'teacher'])
+                ->orWhereIn(DB::raw('LOWER(role)'), ['teacher'])
+                ->count();
+        });
+        $data['total_parent'] = $this->safeCount(function () {
+            return User::whereIn(DB::raw('LOWER(usertype)'), ['parent'])->count();
+        });
+        $data['total_staff'] = $this->safeCount(function () {
+            return User::whereIn(DB::raw('LOWER(usertype)'), ['employee', 'staff'])
+                ->orWhereIn(DB::raw('LOWER(role)'), ['staff'])
+                ->count();
+        });
+        $data['total_classes'] = $this->safeCount(function () {
+            return \App\Models\StudentClass::count();
+        });
+        $data['fees_collected'] = $this->safeCurrency($this->safeSum(function () {
+            if (Schema::hasTable('fee_payments')) {
+                return \App\Models\FeePayment::sum('amount_paid');
+            }
+
+            if (Schema::hasTable('payments')) {
+                return \App\Models\Payment::where('status', 'success')->sum('amount');
+            }
+
+            return 0;
+        }));
+        $data['pending_admissions'] = $this->safeCount(function () {
+            return Schema::hasTable('admissions') ? DB::table('admissions')->where('status', 'pending')->count() : 0;
+        });
+        $data['upcoming_events_count'] = $this->safeCount(function () {
+            return \App\Models\Event::whereBetween('event_date', [Carbon::today(), Carbon::today()->addDays(30)])->count();
+        });
+        $data['library_books_issued'] = $this->safeCount(function () {
+            return Schema::hasTable('book_issues') ? DB::table('book_issues')->whereNull('returned_at')->count() : 0;
+        });
         
-        // Calculate attendance percentage for today
-        $date = date('Y-m-d');
-        $total_present = EmployeeAttendance::where('date', $date)->where('attend_status', 'Present')->count();
-        $total_attendance_records = EmployeeAttendance::where('date', $date)->count();
-        
-        if ($total_attendance_records > 0) {
-            $data['attendance_today'] = round(($total_present / $total_attendance_records) * 100, 2);
-        } else {
-            $data['attendance_today'] = 0;
-        }
+        $attendanceSummary = $this->safeAttendanceSummary();
+        $data['attendance_today'] = $attendanceSummary['percentage'];
+        $data['attendance_present_today'] = $attendanceSummary['present'];
+        $data['attendance_records_today'] = $attendanceSummary['total'];
 
         // Fetch new arrivals (latest 5 students)
         $data['recent_students'] = User::where('usertype', 'Student')->latest()->limit(5)->get();
+        $data['class_distribution'] = $this->safeClassDistribution();
+        $data['performance_distribution'] = $this->safePerformanceDistribution();
+        $data['attendance_distribution'] = $this->safeAttendanceDistribution();
+        $data['fee_status_distribution'] = $this->safeFeeStatusDistribution();
 
         $data['upcoming_events'] = \App\Models\Event::where('event_date', '>=', date('Y-m-d'))
             ->orderBy('event_date', 'asc')
@@ -132,6 +168,118 @@ class AdminController extends Controller
         }
 
         return view('admin.index', $data);
+    }
+
+    private function safeCount(callable $query): int
+    {
+        try {
+            return (int) $query();
+        } catch (\Throwable $e) {
+            return 0;
+        }
+    }
+
+    private function safeSum(callable $query): float
+    {
+        try {
+            return (float) $query();
+        } catch (\Throwable $e) {
+            return 0;
+        }
+    }
+
+    private function safeCurrency(float $amount): string
+    {
+        return '₦' . number_format($amount, 2);
+    }
+
+    private function safeClassDistribution()
+    {
+        try {
+            return \App\Models\StudentClass::leftJoin('assign_students', 'student_classes.id', '=', 'assign_students.class_id')
+                ->select('student_classes.name', DB::raw('COUNT(assign_students.student_id) as students_count'))
+                ->groupBy('student_classes.id', 'student_classes.name')
+                ->orderBy('student_classes.name')
+                ->pluck('students_count', 'name');
+        } catch (\Throwable $e) {
+            return collect();
+        }
+    }
+
+    private function safePerformanceDistribution()
+    {
+        try {
+            if (!Schema::hasTable('student_marks')) {
+                return collect();
+            }
+
+            $scoreColumn = Schema::hasColumn('student_marks', 'total_score') ? 'total_score' : 'marks';
+
+            return \App\Models\StudentClass::leftJoin('student_marks', 'student_classes.id', '=', 'student_marks.class_id')
+                ->select('student_classes.name', DB::raw("ROUND(AVG(student_marks.{$scoreColumn}), 1) as average_score"))
+                ->groupBy('student_classes.id', 'student_classes.name')
+                ->orderBy('student_classes.name')
+                ->pluck('average_score', 'name')
+                ->map(fn ($score) => round((float) $score, 1));
+        } catch (\Throwable $e) {
+            return collect();
+        }
+    }
+
+    private function safeAttendanceDistribution()
+    {
+        try {
+            if (!Schema::hasTable('student_attendances')) {
+                return collect();
+            }
+
+            return \App\Models\StudentAttendance::whereDate('date', Carbon::today())
+                ->select('attend_status', DB::raw('COUNT(*) as total'))
+                ->groupBy('attend_status')
+                ->pluck('total', 'attend_status');
+        } catch (\Throwable $e) {
+            return collect();
+        }
+    }
+
+    private function safeAttendanceSummary(): array
+    {
+        try {
+            if (!Schema::hasTable('student_attendances')) {
+                return ['percentage' => 0, 'present' => 0, 'total' => 0];
+            }
+
+            $today = Carbon::today();
+            $present = \App\Models\StudentAttendance::whereDate('date', $today)
+                ->where('attend_status', 'Present')
+                ->count();
+            $total = \App\Models\StudentAttendance::whereDate('date', $today)->count();
+
+            return [
+                'percentage' => $total > 0 ? round(($present / $total) * 100, 2) : 0,
+                'present' => $present,
+                'total' => $total,
+            ];
+        } catch (\Throwable $e) {
+            return ['percentage' => 0, 'present' => 0, 'total' => 0];
+        }
+    }
+
+    private function safeFeeStatusDistribution()
+    {
+        try {
+            if (!Schema::hasTable('student_fees')) {
+                return collect();
+            }
+
+            return collect([
+                'Paid' => DB::table('student_fees')->where('balance', '<=', 0)->count(),
+                'Partial' => DB::table('student_fees')->where('total_paid', '>', 0)->where('balance', '>', 0)->count(),
+                'Unpaid' => DB::table('student_fees')->where('total_paid', '<=', 0)->where('balance', '>', 0)->count(),
+            ]);
+        } catch (\Throwable $e) {
+            return collect();
+        }
     }
 }
  

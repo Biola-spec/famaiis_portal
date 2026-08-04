@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <title>Student Report Card</title>
 <style>
-    @page { margin: 20px; }
+    @page { size: A4 portrait; margin: {{ !empty($forPdf) ? '6mm' : '20px' }}; }
     body {
         font-family: Arial, sans-serif;
         color: #000;
@@ -12,15 +12,17 @@
         padding: 0;
         background: #fff;
         line-height: 1.2;
+        font-size: {{ !empty($forPdf) ? '9px' : '11px' }};
     }
     .report-card {
         width: 100%;
-        max-width: 900px;
+        max-width: {{ !empty($forPdf) ? 'none' : '900px' }};
         margin: 0 auto;
-        border: 2px solid #002366;
-        padding: 10px;
+        border: {{ !empty($forPdf) ? '1px' : '2px' }} solid #002366;
+        padding: {{ !empty($forPdf) ? '5px' : '10px' }};
         box-sizing: border-box;
         position: relative;
+        page-break-inside: avoid;
     }
     .watermark {
         position: absolute;
@@ -28,7 +30,7 @@
         left: 50%;
         transform: translate(-50%, -30%);
         opacity: 0.05;
-        width: 300px;
+        width: {{ !empty($forPdf) ? '220px' : '300px' }};
         z-index: 0;
         pointer-events: none;
     }
@@ -37,39 +39,51 @@
         z-index: 1;
     }
     .header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+        width: 100%;
+        border-collapse: collapse;
         text-align: center;
         color: #002366;
-        margin-bottom: 5px;
+        margin-bottom: {{ !empty($forPdf) ? '2px' : '5px' }};
+    }
+    .header td {
+        border: none;
+        vertical-align: middle;
+        padding: 0;
+    }
+    .header .image-cell {
+        width: {{ !empty($forPdf) ? '58px' : '80px' }};
     }
     .header .logo {
-        width: 70px;
-        height: auto;
+        width: {{ !empty($forPdf) ? '50px' : '70px' }};
+        height: {{ !empty($forPdf) ? '50px' : '70px' }};
+        object-fit: contain;
+        image-orientation: from-image;
+        transform: rotate(0deg);
     }
     .header .title-area {
-        flex-grow: 1;
         padding: 0 10px;
     }
     .header h1 {
         margin: 0;
-        font-size: 20px;
-        font-weight: bold;
+        font-size: {{ !empty($forPdf) ? '20px' : '28px' }};
+        font-weight: 800;
+        letter-spacing: 0.6px;
+        line-height: 1.05;
+        color: #002366;
     }
     .header p {
-        margin: 2px 0;
-        font-size: 13px;
+        margin: {{ !empty($forPdf) ? '1px 0' : '2px 0' }};
+        font-size: {{ !empty($forPdf) ? '9px' : '13px' }};
         font-weight: bold;
     }
     .header h2 {
-        margin: 2px 0;
-        font-size: 16px;
+        margin: {{ !empty($forPdf) ? '1px 0' : '2px 0' }};
+        font-size: {{ !empty($forPdf) ? '11px' : '16px' }};
         font-weight: bold;
     }
     .header h3 {
         margin: 0;
-        font-size: 14px;
+        font-size: {{ !empty($forPdf) ? '10px' : '14px' }};
         color: #000;
         background: none;
         padding: 0;
@@ -77,21 +91,21 @@
     .section-title {
         background: #002366;
         color: white;
-        padding: 4px 8px;
-        font-size: 12px;
+        padding: {{ !empty($forPdf) ? '2px 5px' : '4px 8px' }};
+        font-size: {{ !empty($forPdf) ? '8.5px' : '12px' }};
         font-weight: bold;
-        margin: 8px 0 0 0;
+        margin: {{ !empty($forPdf) ? '4px 0 0 0' : '8px 0 0 0' }};
         text-transform: uppercase;
     }
     table {
         width: 100%;
         border-collapse: collapse;
-        font-size: 11px;
+        font-size: {{ !empty($forPdf) ? '8px' : '11px' }};
         margin-bottom: 0;
     }
     table th, table td {
         border: 1px solid #777;
-        padding: 3px;
+        padding: {{ !empty($forPdf) ? '1.5px' : '3px' }};
         text-align: center;
     }
     table th {
@@ -104,12 +118,12 @@
         border: 1px solid #777;
         border-top: none;
         width: 100%;
-        font-size: 11px;
+        font-size: {{ !empty($forPdf) ? '8px' : '11px' }};
     }
     .particulars-table td {
         border: none;
         text-align: left;
-        padding: 3px 8px;
+        padding: {{ !empty($forPdf) ? '1.5px 4px' : '3px 8px' }};
     }
     .particulars-table td strong {
         font-weight: normal;
@@ -128,7 +142,7 @@
     
     .grid-2 {
         display: flex;
-        gap: 15px;
+        gap: {{ !empty($forPdf) ? '6px' : '15px' }};
         margin-top: 0;
     }
     .grid-2 > div {
@@ -146,47 +160,45 @@
         border-bottom: 1px solid #ccc;
         border-left: 1px solid #ccc;
         border-right: 1px solid #ccc;
-        padding: 2px 4px;
+        padding: {{ !empty($forPdf) ? '1px 2px' : '2px 4px' }};
     }
     
     .remark-box {
         border: 1px solid #777;
         border-top: none;
-        padding: 5px;
-        font-size: 11px;
-        min-height: 20px;
+        padding: {{ !empty($forPdf) ? '2px' : '5px' }};
+        font-size: {{ !empty($forPdf) ? '8px' : '11px' }};
+        min-height: {{ !empty($forPdf) ? '28px' : '52px' }};
+        position: relative;
+    }
+    .remark-signoff {
+        margin-top: {{ !empty($forPdf) ? '5px' : '12px' }};
+        padding-top: {{ !empty($forPdf) ? '2px' : '4px' }};
+        border-top: 1px solid #777;
+        font-size: {{ !empty($forPdf) ? '7.5px' : '10px' }};
+        line-height: 1.25;
+    }
+    .remark-signoff strong {
+        color: #333;
+    }
+    .remarks-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: {{ !empty($forPdf) ? '4px' : '8px' }};
+    }
+    .remarks-table td {
+        border: none;
+        vertical-align: top;
+        width: 50%;
+        padding: 0;
+    }
+    .remarks-table .left-remark {
+        padding-right: {{ !empty($forPdf) ? '4px' : '8px' }};
+    }
+    .remarks-table .right-remark {
+        padding-left: {{ !empty($forPdf) ? '4px' : '8px' }};
     }
     
-    .signatures {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-end;
-        margin-top: 15px;
-        text-align: center;
-        font-size: 11px;
-        font-weight: bold;
-    }
-    .signatures .sign-box {
-        width: 200px;
-    }
-    .signatures .sign-line {
-        border-bottom: 1px solid #000;
-        margin-bottom: 3px;
-        height: 25px;
-    }
-    .seal-box {
-        text-align: center;
-        color: #002366;
-        font-weight: bold;
-    }
-    .seal-box img {
-        width: 60px;
-        height: 60px;
-        border-radius: 50%;
-        border: 2px solid #002366;
-        margin-bottom: 3px;
-    }
-
     @media print {
         .print-button { display: none; }
         .report-card { border: 4px solid #002366; }
@@ -201,35 +213,90 @@
     $classInfo = optional($allMarks[0])->student_class;
     $yearInfo = optional($allMarks[0])->year;
 
-    $schoolLogo = !empty($setting->logo) ? url($setting->logo) : url('upload/logo/no_image.jpg');
-    $studentImage = !empty($studentInfo->image) ? url('upload/student_images/'.$studentInfo->image) : url('upload/no_image.jpg');
+    $normalizePdfImage = function ($absolutePath) {
+        $extension = strtolower(pathinfo($absolutePath, PATHINFO_EXTENSION));
+
+        if (!in_array($extension, ['jpg', 'jpeg'], true)
+            || !function_exists('exif_read_data')
+            || !function_exists('imagecreatefromjpeg')
+            || !function_exists('imagerotate')
+        ) {
+            return str_replace('\\', '/', $absolutePath);
+        }
+
+        $exif = @exif_read_data($absolutePath);
+        $orientation = (int) ($exif['Orientation'] ?? 1);
+
+        if (!in_array($orientation, [3, 6, 8], true)) {
+            return str_replace('\\', '/', $absolutePath);
+        }
+
+        $image = @imagecreatefromjpeg($absolutePath);
+        if (!$image) {
+            return str_replace('\\', '/', $absolutePath);
+        }
+
+        if ($orientation === 3) {
+            $image = imagerotate($image, 180, 0);
+        } elseif ($orientation === 6) {
+            $image = imagerotate($image, -90, 0);
+        } elseif ($orientation === 8) {
+            $image = imagerotate($image, 90, 0);
+        }
+
+        ob_start();
+        imagejpeg($image, null, 90);
+        $contents = ob_get_clean();
+        imagedestroy($image);
+
+        return 'data:image/jpeg;base64,'.base64_encode($contents);
+    };
+
+    $pdfAsset = function ($path, $fallback) use ($forPdf, $normalizePdfImage) {
+        $relativePath = $path ?: $fallback;
+        $absolutePath = public_path($relativePath);
+
+        if (!file_exists($absolutePath)) {
+            $absolutePath = public_path($fallback);
+            $relativePath = $fallback;
+        }
+
+        return !empty($forPdf) ? $normalizePdfImage($absolutePath) : url($relativePath);
+    };
+
+    $schoolLogo = $pdfAsset(optional($setting)->logo, 'upload/logo/no_image.jpg');
+    $studentImage = $pdfAsset(!empty($studentInfo->image) ? 'upload/student_images/'.$studentInfo->image : null, 'upload/no_image.jpg');
 @endphp
 
-<div style="text-align: right; margin: 20px auto; max-width: 950px;" class="print-button">
-    <button onclick="window.print()" style="padding: 10px 20px; background: #002366; color: #fff; border: none; cursor: pointer; font-size: 16px; font-weight: bold;">Print Report Card</button>
-</div>
+@empty($forPdf)
+    <div style="text-align: right; margin: 20px auto; max-width: 950px;" class="print-button">
+        <button onclick="window.print()" style="padding: 10px 20px; background: #002366; color: #fff; border: none; cursor: pointer; font-size: 16px; font-weight: bold;">Print Report Card</button>
+    </div>
+@endempty
 
 <div class="report-card">
     <img src="{{ $schoolLogo }}" class="watermark" alt="Watermark">
     
     <div class="content-wrapper">
-        <div class="header">
-            <div>
-                <img src="{{ $schoolLogo }}" class="logo" alt="School Logo">
-            </div>
-            <div class="title-area">
-                <h1>{{ strtoupper(optional($setting)->school_name ?? 'FEDERAL GOVERNMENT COLLEGE, ABUJA') }}</h1>
-                <p>{{ strtoupper(optional($setting)->school_address ?? 'P.M.B. 123, GARKI, ABUJA') }}</p> 
-                @if(optional($setting)->school_mobile_one)
-                    <p>TEL: {{ $setting->school_mobile_one }} {{ $setting->school_mobile_two ? '/ '.$setting->school_mobile_two : '' }}</p>
-                @endif
-                <h2>{{ $sectionInfo ? strtoupper($sectionInfo->name) : 'SECONDARY' }} REPORT CARD</h2>
-                <h3>{{ optional($yearInfo)->name }} ACADEMIC SESSION</h3>
-            </div>
-            <div>
-                <img src="{{ $studentImage }}" class="logo" alt="Student Passport" style="border: 2px solid #002366; object-fit: cover;">
-            </div>
-        </div>
+        <table class="header">
+            <tr>
+                <td class="image-cell">
+                    <img src="{{ $studentImage }}" class="logo" alt="Student Passport" style="border: 2px solid #002366; object-fit: cover;">
+                </td>
+                <td class="title-area">
+                    <h1>{{ strtoupper(optional($setting)->school_name ?? 'FEDERAL GOVERNMENT COLLEGE, ABUJA') }}</h1>
+                    <p>{{ strtoupper(optional($setting)->school_address ?? 'P.M.B. 123, GARKI, ABUJA') }}</p>
+                    @if(optional($setting)->school_mobile_one)
+                        <p>TEL: {{ $setting->school_mobile_one }} {{ $setting->school_mobile_two ? '/ '.$setting->school_mobile_two : '' }}</p>
+                    @endif
+                    <h2>{{ $sectionInfo ? strtoupper($sectionInfo->name) : 'SECONDARY' }} REPORT CARD</h2>
+                    <h3>{{ optional($yearInfo)->name }} ACADEMIC SESSION</h3>
+                </td>
+                <td class="image-cell">
+                    <img src="{{ $schoolLogo }}" class="logo" alt="School Logo">
+                </td>
+            </tr>
+        </table>
 
         <!-- A. STUDENT'S PARTICULARS -->
         <div class="section-title">A. STUDENT'S PARTICULARS</div>
@@ -487,52 +554,34 @@
             </div>
         </div>
 
-        <!-- G. CLASS TEACHER'S REMARK -->
-        <div class="section-title">G. CLASS TEACHER'S REMARK</div>
-        <div class="remark-box">
-            @if(isset($assessment) && $assessment->teacher_comment)
-                {{ $assessment->teacher_comment }}
-            @endif
-        </div>
-
-        <!-- H. {{ $sectionInfo && $sectionInfo->head_title ? strtoupper($sectionInfo->head_title) : 'PRINCIPAL' }}'S REMARK -->
-        <div class="section-title">H. {{ $sectionInfo && $sectionInfo->head_title ? strtoupper($sectionInfo->head_title) : 'PRINCIPAL' }}'S REMARK</div>
-        <div class="remark-box">
-            @if(isset($assessment) && $assessment->head_teacher_comment)
-                {{ $assessment->head_teacher_comment }}
-            @endif
-        </div>
-
-        <!-- SIGNATURES -->
-        <div class="signatures">
-            <div class="sign-box">
-                <div class="sign-line"></div>
-                CLASS TEACHER
-                <br>
-                <span style="font-weight:bold; color: #555;">{{ optional($classTeacher->teacher)->name ?? '---' }}</span>
-                <br>
-                <span style="font-weight:normal; font-size: 11px;">Date: {{ date('jS F, Y') }}</span>
-            </div>
-            
-            <div class="seal-box">
-                <img src="{{ $schoolLogo }}" alt="School Seal">
-                <br>
-                SCHOOL SEAL
-            </div>
-
-            <div class="sign-box">
-                <div class="sign-line"></div>
-                @if($sectionInfo && $sectionInfo->head_title)
-                    {{ strtoupper($sectionInfo->head_title) }}
-                    <br>
-                    <span style="font-weight:bold; color: #555;">{{ optional($sectionInfo->headTeacher)->name }}</span>
-                @else
-                    PRINCIPAL
-                @endif
-                <br>
-                <span style="font-weight:normal; font-size: 11px;">Date: {{ date('jS F, Y') }}</span>
-            </div>
-        </div>
+        <table class="remarks-table">
+            <tr>
+                <td class="left-remark">
+                    <div class="section-title">CLASS TEACHER'S REMARK</div>
+                    <div class="remark-box">
+                        @if(isset($assessment) && $assessment->teacher_comment)
+                            {{ $assessment->teacher_comment }}
+                        @endif
+                        <div class="remark-signoff">
+                            <strong>Class Teacher:</strong> {{ optional($classTeacher->teacher)->name ?? '---' }}<br>
+                            <strong>Date:</strong> {{ date('jS F, Y') }}
+                        </div>
+                    </div>
+                </td>
+                <td class="right-remark">
+                    <div class="section-title">{{ $sectionInfo && $sectionInfo->head_title ? strtoupper($sectionInfo->head_title) : 'PRINCIPAL' }}'S REMARK</div>
+                    <div class="remark-box">
+                        @if(isset($assessment) && $assessment->head_teacher_comment)
+                            {{ $assessment->head_teacher_comment }}
+                        @endif
+                        <div class="remark-signoff">
+                            <strong>{{ $sectionInfo && $sectionInfo->head_title ? $sectionInfo->head_title : 'Principal' }}:</strong> {{ optional($sectionInfo->headTeacher)->name ?? '---' }}<br>
+                            <strong>Date:</strong> {{ date('jS F, Y') }}
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        </table>
 
     </div>
 </div>

@@ -6,6 +6,7 @@ use App\Models\AssignClassTeacher;
 use App\Models\AcademicSetting;
 use App\Models\ClassMarkingSetting;
 use App\Models\MarksGrade;
+use App\Models\SiteSetting;
 use App\Models\StudentAssessment;
 use App\Models\StudentMarks;
 
@@ -14,7 +15,7 @@ class ReportCardService
     /**
      * @return \Illuminate\View\View|\Illuminate\Http\RedirectResponse
      */
-    public function render(int $yearId, int $classId, ?int $sectionId, string $term, string $idNo)
+    public function render(int $yearId, int $classId, ?int $sectionId, string $term, string $idNo, bool $forPdf = false)
     {
         $query = StudentMarks::where('year_id', $yearId)
             ->where('class_id', $classId)
@@ -93,6 +94,7 @@ class ReportCardService
             ->where('section_id', $sectionId)
             ->first();
 
+        $setting = SiteSetting::first();
         $academicSetting = AcademicSetting::first();
         $assessmentAreas = $academicSetting->assessment_areas ?? ['Punctuality', 'Attendance', 'Neatness', 'Politeness', 'Honesty', 'Relationship_with_peers'];
 
@@ -105,6 +107,8 @@ class ReportCardService
             'studentInfo',
             'sectionInfo',
             'classTeacher',
+            'setting',
+            'forPdf',
             'assessmentAreas'
         ) + [
             'year_id' => $yearId,

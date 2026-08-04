@@ -18,18 +18,38 @@ use Illuminate\Support\Facades\Auth;
 
 class StudentRegController extends Controller
 {
-    public function StudentRegView(){
+    public function StudentRegView(Request $request){
         if (Auth::user()->hasRole('Parent')) {
             abort(403, 'Unauthorized access to Student Management');
         }
     	$data['years']    = StudentYear::all();
     	$data['classes']  = StudentClass::all();
-    	$data['groups']   = StudentGroup::all();
-    	$data['sections'] = SchoolSection::all();
+        $data['groups']   = StudentGroup::all();
+        $data['sections'] = SchoolSection::all();
+        $data['year_id'] = $request->year_id;
+        $data['class_id'] = $request->class_id;
+        $data['search_query'] = $request->search_query;
 
     	$data['allData']  = AssignStudent::with(['student', 'student_year', 'student_class', 'discount'])
             ->whereHas('student')
-            ->get();
+            ->when($request->year_id, function($query) use ($request) {
+                return $query->where('year_id', $request->year_id);
+            })
+            ->when($request->class_id, function($query) use ($request) {
+                return $query->where('class_id', $request->class_id);
+            })
+            ->when($request->search_query, function($query) use ($request) {
+                return $query->whereHas('student', function($q) use ($request) {
+                    $q->where('name', 'like', '%'.$request->search_query.'%')
+                      ->orWhere('first_name', 'like', '%'.$request->search_query.'%')
+                      ->orWhere('surname', 'like', '%'.$request->search_query.'%')
+                      ->orWhere('middle_name', 'like', '%'.$request->search_query.'%')
+                      ->orWhere('id_no', 'like', '%'.$request->search_query.'%');
+                });
+            })
+            ->latest()
+            ->paginate(10)
+            ->withQueryString();
     	return view('backend.student.student_reg.student_view', $data);
     }
 
@@ -53,13 +73,59 @@ class StudentRegController extends Controller
             ->when($request->search_query, function($query) use ($request) {
                 return $query->whereHas('student', function($q) use ($request) {
                     $q->where('name', 'like', '%'.$request->search_query.'%')
+                      ->orWhere('first_name', 'like', '%'.$request->search_query.'%')
+                      ->orWhere('surname', 'like', '%'.$request->search_query.'%')
+                      ->orWhere('middle_name', 'like', '%'.$request->search_query.'%')
                       ->orWhere('id_no', 'like', '%'.$request->search_query.'%');
                 });
             })
-            ->get();
+            ->latest()
+            ->paginate(10)
+            ->withQueryString();
 
     	$data['search'] = true;
     	return view('backend.student.student_reg.student_view', $data);
+    }
+
+    public function StudentRegLiveSearch(Request $request)
+    {
+        if (Auth::user()->hasRole('Parent')) {
+            abort(403, 'Unauthorized access to Student Management');
+        }
+
+        $allData = $this->studentRegistrationQuery($request)
+            ->latest()
+            ->paginate(10)
+            ->withQueryString();
+
+        return response()->json([
+            'rows' => view('backend.student.student_reg.partials.student_rows', compact('allData'))->render(),
+            'pagination' => $allData->links('pagination::bootstrap-4')->render(),
+            'showing' => $allData->total() > 0
+                ? 'Showing '.$allData->firstItem().' to '.$allData->lastItem().' of '.$allData->total().' students'
+                : 'No students found',
+        ]);
+    }
+
+    private function studentRegistrationQuery(Request $request)
+    {
+        return AssignStudent::with(['student', 'student_year', 'student_class', 'discount'])
+            ->whereHas('student')
+            ->when($request->year_id, function($query) use ($request) {
+                return $query->where('year_id', $request->year_id);
+            })
+            ->when($request->class_id, function($query) use ($request) {
+                return $query->where('class_id', $request->class_id);
+            })
+            ->when($request->search_query, function($query) use ($request) {
+                return $query->whereHas('student', function($q) use ($request) {
+                    $q->where('name', 'like', '%'.$request->search_query.'%')
+                      ->orWhere('first_name', 'like', '%'.$request->search_query.'%')
+                      ->orWhere('surname', 'like', '%'.$request->search_query.'%')
+                      ->orWhere('middle_name', 'like', '%'.$request->search_query.'%')
+                      ->orWhere('id_no', 'like', '%'.$request->search_query.'%');
+                });
+            });
     }
 
     public function StudentRegAdd(){

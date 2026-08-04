@@ -19,7 +19,7 @@
 
 				  <div class="box-body">
 				
-		<form method="GET" action="{{ route('student.year.class.wise') }}">
+		<form method="GET" action="{{ route('student.registration.view') }}">
 			
 			<div class="row">
 
@@ -29,8 +29,8 @@
     <div class="form-group">
 		<h5>Year <span class="text-danger"> </span></h5>
 		<div class="controls">
-	        <select name="year_id" required="" class="form-control">
-			    <option value="" selected="" disabled="">Select Year</option>
+	        <select name="year_id" class="form-control">
+			    <option value="">All Years</option>
 			    @foreach($years as $year)
                     <option value="{{ $year->id }}" {{ (@$year_id == $year->id)? "selected":"" }} >{{ $year->name }}</option>
 		 	    @endforeach
@@ -43,8 +43,8 @@
     <div class="form-group">
 		<h5>Class <span class="text-danger"> </span></h5>
 		<div class="controls">
-	        <select name="class_id" required="" class="form-control">
-			    <option value="" selected="" disabled="">Select Class</option>
+	        <select name="class_id" class="form-control">
+			    <option value="">All Classes</option>
 			    @foreach($classes as $class)
 			        <option value="{{ $class->id }}" {{ (@$class_id == $class->id)? "selected":"" }}>{{ $class->name }}</option>
 		 	    @endforeach
@@ -57,7 +57,7 @@
     <div class="form-group">
 		<h5>Search <span class="text-danger"> </span></h5>
 		<div class="controls">
-	        <input type="text" name="search_query" class="form-control" placeholder="Name or ID No" value="{{ @$search_query }}">
+	        <input type="text" name="search_query" id="student-live-search" class="form-control" placeholder="Search by student name" value="{{ @$search_query }}" autocomplete="off">
 	    </div>		 
 	</div>
 </div> <!-- End Col md 4 --> 
@@ -108,8 +108,7 @@
 				<div class="box-body">
 					<div class="table-responsive">
 
-	@if(!isset($search))					
-	 <table id="example1" class="table table-bordered table-striped">
+	 <table class="table table-bordered table-striped">
 						<thead>
 			<tr>
 				<th width="5%">SL</th>  
@@ -126,103 +125,25 @@
 				 
 			</tr>
 		</thead>
-		<tbody>
-			@foreach($allData as $key => $value )
-			<tr>
-				<td>{{ $key+1 }}</td>
-				<td> {{ $value['student']['name'] ?? 'N/A' }}</td>
-				<td> {{ $value['student']['id_no'] ?? 'N/A' }}</td>	
-				<td> {{ $value->roll }}  </td>	
-				<td> {{ $value['student_year']['name'] ?? 'N/A' }}</td>	
-				<td>  {{ $value['student_class']['name'] ?? 'N/A' }}</td>	
-				<td>
-	 <img src="{{ (!empty($value['student']) && !empty($value['student']['image']))? url('upload/student_images/'.$value['student']['image']):url('upload/no_image.jpg') }}" style="width: 60px; width: 60px;"> 
-				</td>	
-				<td> {{ $value->year_id }}</td>				 
-				<td>
-@if(Auth::user()->hasPermission('edit_student'))
-<a title="Edit" href="{{ route('student.registration.edit',$value->student_id) }}" class="btn btn-info"> <i class="fa fa-edit"></i> </a>
-@endif
-
-<a title="Promotion" href="{{ route('student.registration.promotion',$value->student_id) }}" class="btn btn-primary" ><i class="fa fa-check"></i></a>
-
-<a target="_blank" title="Details" href="{{ route('student.registration.details',$value->student_id) }}" class="btn btn-danger"  ><i class="fa fa-eye"></i></a>
-
-@if(Auth::user()->hasPermission('delete_student'))
-<a title="Delete" href="{{ route('student.registration.delete',$value->id) }}" class="btn btn-warning" id="delete" ><i class="fa fa-trash"></i></a>
-@endif
-
-				</td>
-				 
-			</tr>
-			@endforeach
-							 
+		<tbody id="student-table-body">
+			@include('backend.student.student_reg.partials.student_rows', ['allData' => $allData])
 						</tbody>
 						<tfoot>
 							 
 						</tfoot>
 					  </table>
 
-			@else
+					<div id="student-result-count" class="text-muted mb-2">
+						@if($allData->total() > 0)
+							Showing {{ $allData->firstItem() }} to {{ $allData->lastItem() }} of {{ $allData->total() }} students
+						@else
+							No students found
+						@endif
+					</div>
 
-	  <table id="example1" class="table table-bordered table-striped">
-						<thead>
-			<tr>
-				<th width="5%">SL</th>  
-				<th>Name</th>
-				<th>ID No</th>
-				<th>Roll</th>
-				<th>Year</th>
-				<th>Class</th>
-				<th>Image</th>
-				@if(Auth::user()->role == "Admin")
-				<th>Code</th>
-				 @endif
-				<th width="25%">Action</th>
-				 
-			</tr>
-		</thead>
-		<tbody>
-			@foreach($allData as $key => $value )
-			<tr>
-				<td>{{ $key+1 }}</td>
-				<td> {{ $value['student']['name'] ?? 'N/A' }}</td>
-				<td> {{ $value['student']['id_no'] ?? 'N/A' }}</td>	
-				<td> {{ $value->roll }}  </td>	
-				<td> {{ $value['student_year']['name'] ?? 'N/A' }}</td>	
-				<td>  {{ $value['student_class']['name'] ?? 'N/A' }}</td>	
-				<td>
-	 <img src="{{ (!empty($value['student']) && !empty($value['student']['image']))? url('upload/student_images/'.$value['student']['image']):url('upload/no_image.jpg') }}" style="width: 60px; width: 60px;"> 
-				</td>	
-				<td> {{ $value->year_id }}</td>				 
-				<td>
-@if(Auth::user()->hasPermission('edit_student'))
-<a title="Edit" href="{{ route('student.registration.edit',$value->student_id) }}" class="btn btn-info"> <i class="fa fa-edit"></i> </a>
-@endif
-
-<a title="Promotion" href="{{ route('student.registration.promotion',$value->student_id) }}" class="btn btn-primary" ><i class="fa fa-check"></i></a>
-
-<a target="_blank" title="Details" href="{{ route('student.registration.details',$value->student_id) }}" class="btn btn-danger"  ><i class="fa fa-eye"></i></a>
-
-@if(Auth::user()->hasPermission('delete_student'))
-<a title="Delete" href="{{ route('student.registration.delete',$value->id) }}" class="btn btn-warning" id="delete" ><i class="fa fa-trash"></i></a>
-@endif
-
-				</td>
-				 
-			</tr>
-			@endforeach
-							 
-						</tbody>
-						<tfoot>
-							 
-						</tfoot>
-					  </table>
-
-
-			@endif
-
-
+					<div class="mt-3" id="student-pagination">
+						{{ $allData->links('pagination::bootstrap-4') }}
+					</div>
 
 					</div>
 				</div>
@@ -246,6 +167,68 @@
 
 
 @endsection
+
+@push('scripts')
+<script type="text/javascript">
+$(function () {
+	var liveSearchTimer = null;
+	var liveSearchRequest = null;
+	var endpoint = "{{ route('student.registration.live-search') }}";
+
+	function collectStudentFilters(extraUrl) {
+		if (extraUrl) {
+			return extraUrl.split('?')[1] || '';
+		}
+
+		return $.param({
+			year_id: $('select[name="year_id"]').val(),
+			class_id: $('select[name="class_id"]').val(),
+			search_query: $('#student-live-search').val()
+		});
+	}
+
+	function loadStudents(extraUrl) {
+		var query = collectStudentFilters(extraUrl);
+
+		if (liveSearchRequest) {
+			liveSearchRequest.abort();
+		}
+
+		$('#student-result-count').text('Searching...');
+
+		liveSearchRequest = $.ajax({
+			url: endpoint + (query ? '?' + query : ''),
+			method: 'GET',
+			dataType: 'json',
+			success: function (response) {
+				$('#student-table-body').html(response.rows);
+				$('#student-pagination').html(response.pagination);
+				$('#student-result-count').text(response.showing);
+			},
+			error: function (xhr) {
+				if (xhr.statusText !== 'abort') {
+					$('#student-result-count').text('Unable to search students. Please try again.');
+				}
+			}
+		});
+	}
+
+	$('#student-live-search').on('keyup', function () {
+		clearTimeout(liveSearchTimer);
+		liveSearchTimer = setTimeout(loadStudents, 180);
+	});
+
+	$('select[name="year_id"], select[name="class_id"]').on('change', function () {
+		loadStudents();
+	});
+
+	$(document).on('click', '#student-pagination a', function (event) {
+		event.preventDefault();
+		loadStudents($(this).attr('href'));
+	});
+});
+</script>
+@endpush
 
 <!-- Modal -->
 <div class="modal center-modal fade" id="modal-import" tabindex="-1">
