@@ -15,10 +15,12 @@ class AssignSubjectController extends Controller
 {
     public function ViewAssignSubject(){
         $data['allData'] = AssignSubject::with(['student_class', 'section'])->select('class_id', 'section_id')->groupBy('class_id', 'section_id')->get();
-        $data['allAssignments'] = AssignSubject::with(['student_class', 'section', 'school_subject', 'teacher'])
+        $allAssignments = AssignSubject::with(['student_class', 'section', 'school_subject', 'teacher'])
             ->orderBy('class_id')
             ->orderBy('subject_id')
             ->get();
+        $this->attachAssignedTeachers($allAssignments);
+        $data['allAssignments'] = $allAssignments;
     	return view('backend.setup.assign_subject.view_assign_subject',$data);
     }
 
@@ -57,10 +59,10 @@ class AssignSubjectController extends Controller
 
 	public function StoreAssignSubject(Request $request){
 
-	    	$subjectCount = count($request->subject_id);
-	    	if ($subjectCount !=NULL) {
-	    		for ($i=0; $i <$subjectCount ; $i++) { 
-                    $this->saveAssignmentRow($request, $i);
+	    	$subjectIndexes = array_keys($request->subject_id ?? []);
+	    	if (!empty($subjectIndexes)) {
+	    		foreach ($subjectIndexes as $i) {
+                    $this->saveAssignmentRow($request, (int) $i);
 
 	    		} // End For Loop
 	    	}// End If Condition
@@ -77,10 +79,12 @@ class AssignSubjectController extends Controller
 
 	 public function EditAssignSubject($class_id, $section_id = null){
             if ($section_id) {
-                $data['editData'] = AssignSubject::where('class_id',$class_id)->where('section_id', $section_id)->orderBy('subject_id','asc')->get();
+                $editData = AssignSubject::where('class_id',$class_id)->where('section_id', $section_id)->orderBy('subject_id','asc')->get();
             } else {
-                $data['editData'] = AssignSubject::where('class_id',$class_id)->whereNull('section_id')->orderBy('subject_id','asc')->get();
+                $editData = AssignSubject::where('class_id',$class_id)->whereNull('section_id')->orderBy('subject_id','asc')->get();
             }
+        $this->attachAssignedTeachers($editData);
+        $data['editData'] = $editData;
 	    	
 	    $data['subjects'] = SchoolSubject::all();
         $data['sections'] = SchoolSection::all();
@@ -111,10 +115,10 @@ public function UpdateAssignSubject(Request $request,$class_id){
     		 
     	}else{
     		 
-    $countClass = count($request->subject_id);
+    $subjectIndexes = array_keys($request->subject_id ?? []);
 	
-    		for ($i=0; $i <$countClass ; $i++) { 
-                $this->saveAssignmentRow($request, $i, $request->class_id);
+    		foreach ($subjectIndexes as $i) {
+                $this->saveAssignmentRow($request, (int) $i, $request->class_id);
 
     		} // End For Loop	 
 
@@ -131,10 +135,12 @@ public function UpdateAssignSubject(Request $request,$class_id){
 
 	public function DetailsAssignSubject($class_id, $section_id = null){
         if ($section_id) {
-            $data['detailsData'] = AssignSubject::where('class_id',$class_id)->where('section_id', $section_id)->orderBy('subject_id','asc')->get();
+            $detailsData = AssignSubject::where('class_id',$class_id)->where('section_id', $section_id)->orderBy('subject_id','asc')->get();
         } else {
-            $data['detailsData'] = AssignSubject::where('class_id',$class_id)->whereNull('section_id')->orderBy('subject_id','asc')->get();
+            $detailsData = AssignSubject::where('class_id',$class_id)->whereNull('section_id')->orderBy('subject_id','asc')->get();
         }
+        $this->attachAssignedTeachers($detailsData);
+        $data['detailsData'] = $detailsData;
 
    return view('backend.setup.assign_subject.details_assign_subject',$data);
 
@@ -155,26 +161,15 @@ public function UpdateAssignSubject(Request $request,$class_id){
     {
         $classId = is_array($request->class_id) ? $request->class_id[$index] : ($defaultClassId ?? $request->class_id);
         $subjectId = $request->subject_id[$index] ?? null;
-        $teacherId = $request->teacher_id[$index] ?? null;
+        $teacherIds = $request->input("teacher_id.$index", []);
+        if (!is_array($teacherIds)) {
+            $teacherIds = [$teacherIds];
+        }
+        $teacherIds = array_values(array_filter($teacherIds));
+        $teacherId = $teacherIds[0] ?? null;
 
         if (!$classId || !$subjectId || !$teacherId) {
             return;
-        }
-
-        $existingAssignment = AssignSubject::where('class_id', $classId)
-            ->where('subject_id', $subjectId)
-            ->when($request->section_id, function ($query) use ($request) {
-                $query->where('section_id', $request->section_id);
-            }, function ($query) {
-                $query->whereNull('section_id');
-            })
-            ->first();
-
-        if ($existingAssignment && $existingAssignment->teacher_id && (int) $existingAssignment->teacher_id !== (int) $teacherId) {
-            TeacherAssignment::where('teacher_id', $existingAssignment->teacher_id)
-                ->where('class_id', $classId)
-                ->where('subject_id', $subjectId)
-                ->delete();
         }
 
         AssignSubject::updateOrCreate(
@@ -191,14 +186,64 @@ public function UpdateAssignSubject(Request $request,$class_id){
             ]
         );
 
-        TeacherAssignment::updateOrCreate(
-            [
-                'teacher_id' => $teacherId,
-                'class_id' => $classId,
-                'subject_id' => $subjectId,
-            ],
-            []
-        );
+        $assignmentQuery = TeacherAssignment::where('class_id', $classId)
+            ->where('subject_id', $subjectId)
+            ->when($request->section_id, function ($query) use ($request) {
+                $query->where('section_id', $request->section_id);
+            }, function ($query) {
+                $query->whereNull('section_id');
+            });
+
+        $assignmentQuery->whereNotIn('teacher_id', $teacherIds)->delete();
+
+        foreach ($teacherIds as $selectedTeacherId) {
+            TeacherAssignment::updateOrCreate(
+                [
+                    'teacher_id' => $selectedTeacherId,
+                    'class_id' => $classId,
+                    'subject_id' => $subjectId,
+                    'section_id' => $request->section_id,
+                ],
+                []
+            );
+        }
+    }
+
+    private function attachAssignedTeachers($assignments): void
+    {
+        if ($assignments->isEmpty()) {
+            return;
+        }
+
+        $classIds = $assignments->pluck('class_id')->unique();
+        $subjectIds = $assignments->pluck('subject_id')->unique();
+        $sectionIds = $assignments->pluck('section_id')->filter()->unique();
+
+        $teacherAssignments = TeacherAssignment::with('teacher')
+            ->whereIn('class_id', $classIds)
+            ->whereIn('subject_id', $subjectIds)
+            ->where(function ($query) use ($sectionIds) {
+                $query->whereNull('section_id');
+                if ($sectionIds->isNotEmpty()) {
+                    $query->orWhereIn('section_id', $sectionIds);
+                }
+            })
+            ->get()
+            ->groupBy(function ($assignment) {
+                return $this->assignmentKey($assignment->class_id, $assignment->subject_id, $assignment->section_id);
+            });
+
+        foreach ($assignments as $assignment) {
+            $key = $this->assignmentKey($assignment->class_id, $assignment->subject_id, $assignment->section_id);
+            $selectedAssignments = $teacherAssignments->get($key, collect());
+            $assignment->setRelation('assignedTeachers', $selectedAssignments->pluck('teacher')->filter()->values());
+            $assignment->assigned_teacher_ids = $selectedAssignments->pluck('teacher_id')->values()->all();
+        }
+    }
+
+    private function assignmentKey($classId, $subjectId, $sectionId): string
+    {
+        return $classId . '|' . $subjectId . '|' . ($sectionId ?: 'null');
     }
 
 

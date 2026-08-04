@@ -13,6 +13,7 @@ use App\Models\StudentMarks;
 use PDF;
 use App\Models\AssignStudent;
 use App\Models\AssignSubject;
+use App\Models\TeacherAssignment;
 use Auth;
 
 
@@ -24,7 +25,7 @@ class ResultReportController extends Controller
     	    $data['years'] = StudentYear::all();
     	    $data['classes'] = StudentClass::all();
         } else {
-            $assigned = AssignSubject::where('teacher_id', $user->id)->get();
+            $assigned = TeacherAssignment::where('teacher_id', $user->id)->get();
             $data['years'] = StudentYear::all();
             $data['classes'] = StudentClass::whereIn('id', $assigned->pluck('class_id'))->get();
         }

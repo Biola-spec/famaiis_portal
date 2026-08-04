@@ -16,6 +16,7 @@ use DB;
 use PDF;
 
 use App\Models\AssignSubject;
+use App\Models\TeacherAssignment;
 use App\Models\StudentMarks;
 use App\Models\ExamType;
 use App\Models\StudentSection;
@@ -33,7 +34,19 @@ class DefaultController extends Controller
         }
         
         if ($user->role != 'Admin' && !$user->hasRole('Admin')) {
-            $query->where('teacher_id', $user->id);
+            $query->whereIn('subject_id', function ($teacherSubjectQuery) use ($class_id, $request, $user) {
+                $teacherSubjectQuery->select('subject_id')
+                    ->from('teacher_assignments')
+                    ->where('teacher_id', $user->id)
+                    ->where('class_id', $class_id);
+
+                if ($request->section_id) {
+                    $teacherSubjectQuery->where(function ($sectionQuery) use ($request) {
+                        $sectionQuery->where('section_id', $request->section_id)
+                            ->orWhereNull('section_id');
+                    });
+                }
+            });
         }
         
     	$allData = $query->get();
@@ -62,7 +75,7 @@ class DefaultController extends Controller
         // Restrict teachers to their assigned classes/sections
         if (!$user->hasRole('Admin') && ($user->usertype == 'Employee' || $user->hasRole('Teacher'))) {
             // Check if they are a subject teacher for this class/section
-            $isAssignedSubject = \App\Models\AssignSubject::where('teacher_id', $user->id)
+            $isAssignedSubject = TeacherAssignment::where('teacher_id', $user->id)
                 ->where('class_id', $class_id);
             
             if ($request->section_id) {

@@ -8,6 +8,7 @@ use App\Models\Homework;
 use App\Models\StudentClass;
 use App\Models\SchoolSubject;
 use App\Models\AssignSubject;
+use App\Models\TeacherAssignment;
 use App\Models\User;
 use App\Models\AssignStudent;
 use Auth;
@@ -50,7 +51,7 @@ class HomeworkController extends Controller
             $data['subjects'] = SchoolSubject::all();
         } else {
             // For teachers, only show classes and subjects they are assigned to
-            $assigned = AssignSubject::where('teacher_id', $user->id)->get();
+            $assigned = TeacherAssignment::where('teacher_id', $user->id)->get();
             $data['classes'] = StudentClass::whereIn('id', $assigned->pluck('class_id'))->get();
             $data['subjects'] = SchoolSubject::whereIn('id', $assigned->pluck('subject_id'))->get();
         }
@@ -109,7 +110,7 @@ class HomeworkController extends Controller
             $data['classes'] = StudentClass::all();
             $data['subjects'] = SchoolSubject::all();
         } else {
-            $assigned = AssignSubject::where('teacher_id', $user->id)->get();
+            $assigned = TeacherAssignment::where('teacher_id', $user->id)->get();
             $data['classes'] = StudentClass::whereIn('id', $assigned->pluck('class_id'))->get();
             $data['subjects'] = SchoolSubject::whereIn('id', $assigned->pluck('subject_id'))->get();
         }

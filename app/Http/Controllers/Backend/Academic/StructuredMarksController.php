@@ -14,6 +14,7 @@ use App\Models\SchoolSection;
 use App\Models\StudentYear;
 use App\Models\AssignClassTeacher;
 use App\Models\AssignSubject;
+use App\Models\TeacherAssignment;
 use App\Models\StudentSection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -60,7 +61,7 @@ class StructuredMarksController extends Controller
             }
             $classes = $query->orderBy('name')->get();
         } else {
-            $query = AssignSubject::query()
+            $query = TeacherAssignment::query()
                 ->where('teacher_id', $user->id);
 
             if ($request->section_id) {
@@ -143,7 +144,19 @@ class StructuredMarksController extends Controller
                 }
                 
                 if (!$user->hasRole('Admin') && $user->role !== 'Admin') {
-                    $q->where('teacher_id', $user->id);
+                    $q->whereIn('subject_id', function ($teacherSubjectQuery) use ($request, $user) {
+                        $teacherSubjectQuery->select('subject_id')
+                            ->from('teacher_assignments')
+                            ->where('teacher_id', $user->id)
+                            ->where('class_id', $request->class_id);
+
+                        if ($request->section_id) {
+                            $teacherSubjectQuery->where(function ($sectionQuery) use ($request) {
+                                $sectionQuery->where('section_id', $request->section_id)
+                                    ->orWhereNull('section_id');
+                            });
+                        }
+                    });
                 }
             })
             ->get();
@@ -174,7 +187,7 @@ class StructuredMarksController extends Controller
             abort(403, 'Unauthorized access to Academic Management');
         }
         if (!$user->hasRole('Admin', 'Super Admin')) {
-            $assignmentQuery = AssignSubject::query()
+            $assignmentQuery = TeacherAssignment::query()
                 ->where('teacher_id', $user->id)
                 ->where('class_id', $validated['class_id'])
                 ->where('subject_id', $validated['subject_id']);
@@ -287,7 +300,7 @@ class StructuredMarksController extends Controller
 
         $user = Auth::user();
         if (!$user->hasRole('Admin', 'Super Admin')) {
-            $assignmentQuery = AssignSubject::query()
+            $assignmentQuery = TeacherAssignment::query()
                 ->where('teacher_id', $user->id)
                 ->where('class_id', $validated['class_id'])
                 ->where('subject_id', $validated['subject_id']);
@@ -488,7 +501,7 @@ class StructuredMarksController extends Controller
         }
 
         if (!Auth::user()->hasRole('Admin', 'Super Admin')) {
-            $allowed = AssignSubject::query()
+            $allowed = TeacherAssignment::query()
                 ->where('teacher_id', Auth::id())
                 ->get(['class_id', 'subject_id', 'section_id']);
 

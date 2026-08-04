@@ -49,7 +49,13 @@
 				<td> {{ $detail->full_mark }}</td>
 				<td> {{ $detail->pass_mark }}</td>
 				<td> {{ $detail->subjective_mark }}</td>
-				<td> {{ $detail['teacher']['name'] }}</td>
+				<td>
+					@if($detail->assignedTeachers->isNotEmpty())
+						{{ $detail->assignedTeachers->pluck('name')->join(', ') }}
+					@else
+						{{ $detail['teacher']['name'] ?? 'Not Assigned' }}
+					@endif
+				</td>
 			</tr>
 			@endforeach
 							 

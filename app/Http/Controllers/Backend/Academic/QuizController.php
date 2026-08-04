@@ -59,7 +59,7 @@ class QuizController extends Controller
         if ($user->hasRole('Admin') || $user->role === 'Admin') {
             $classes = StudentClass::query()->orderBy('name')->get();
         } else {
-            $assignSubjectClassIds = \App\Models\AssignSubject::query()
+            $assignSubjectClassIds = TeacherAssignment::query()
                 ->where('teacher_id', $user->id)
                 ->pluck('class_id')
                 ->toArray();
@@ -121,7 +121,7 @@ class QuizController extends Controller
         if ($user->hasRole('Admin') || $user->role === 'Admin') {
             $classes = StudentClass::query()->orderBy('name')->get();
         } else {
-            $assignSubjectClassIds = \App\Models\AssignSubject::query()
+            $assignSubjectClassIds = TeacherAssignment::query()
                 ->where('teacher_id', $user->id)
                 ->pluck('class_id')
                 ->toArray();

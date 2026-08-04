@@ -11,6 +11,7 @@ class TeacherAssignment extends Model
 
     protected $fillable = [
         'teacher_id',
+        'section_id',
         'class_id',
         'subject_id',
     ];
@@ -28,5 +29,10 @@ class TeacherAssignment extends Model
     public function subject()
     {
         return $this->belongsTo(SchoolSubject::class, 'subject_id');
+    }
+
+    public function section()
+    {
+        return $this->belongsTo(SchoolSection::class, 'section_id');
     }
 }

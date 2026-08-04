@@ -19,6 +19,7 @@ use App\Models\StudentMarks;
 use App\Models\Term;
 use App\Models\ExamType;
 use App\Models\AssignSubject;
+use App\Models\TeacherAssignment;
 use Auth;
 
 class MarksController extends Controller
@@ -31,7 +32,7 @@ class MarksController extends Controller
     	    $data['classes'] = StudentClass::all();
         } else {
             // Filter by teacher assignment
-            $assigned = AssignSubject::where('teacher_id', $user->id)->get();
+            $assigned = TeacherAssignment::where('teacher_id', $user->id)->get();
             $data['classes'] = StudentClass::whereIn('id', $assigned->pluck('class_id'))->get();
             $data['years'] = StudentYear::all(); // Teachers typically work across all academic years
         }
@@ -82,7 +83,7 @@ class MarksController extends Controller
     	    $data['years'] = StudentYear::all();
     	    $data['classes'] = StudentClass::all();
         } else {
-            $assigned = AssignSubject::where('teacher_id', $user->id)->get();
+            $assigned = TeacherAssignment::where('teacher_id', $user->id)->get();
             $data['classes'] = StudentClass::whereIn('id', $assigned->pluck('class_id'))->get();
             $data['years'] = StudentYear::all();
         }

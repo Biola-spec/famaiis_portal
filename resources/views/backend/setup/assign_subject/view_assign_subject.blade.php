@@ -83,7 +83,13 @@
 			@forelse($allAssignments as $key => $assignment)
 			<tr>
 				<td>{{ $key+1 }}</td>
-				<td>{{ $assignment->teacher->name ?? 'Not Assigned' }}</td>
+				<td>
+					@if($assignment->assignedTeachers->isNotEmpty())
+						{{ $assignment->assignedTeachers->pluck('name')->join(', ') }}
+					@else
+						{{ $assignment->teacher->name ?? 'Not Assigned' }}
+					@endif
+				</td>
 				<td>{{ $assignment->school_subject->name ?? 'N/A' }}</td>
 				<td>{{ $assignment->student_class->name ?? 'N/A' }}</td>
 				<td>{{ $assignment->section->name ?? 'All Sections' }}</td>
