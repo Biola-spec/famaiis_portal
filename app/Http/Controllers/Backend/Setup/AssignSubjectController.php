@@ -146,6 +146,29 @@ public function UpdateAssignSubject(Request $request,$class_id){
 
 
  	}
+
+    public function DeleteAssignSubject($id){
+        $assignment = AssignSubject::findOrFail($id);
+
+        TeacherAssignment::where('class_id', $assignment->class_id)
+            ->where('subject_id', $assignment->subject_id)
+            ->when($assignment->section_id, function ($query) use ($assignment) {
+                $query->where('section_id', $assignment->section_id);
+            }, function ($query) {
+                $query->whereNull('section_id');
+            })
+            ->delete();
+
+        $assignment->delete();
+
+        $notification = array(
+            'message' => 'Assignment deleted successfully',
+            'alert-type' => 'success'
+        );
+
+        return redirect()->route('assign.subject.view')->with($notification);
+    }
+
     private function teacherQuery()
     {
         return User::where(function ($query) {

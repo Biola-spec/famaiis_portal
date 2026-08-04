@@ -317,6 +317,7 @@ Route::post('assign/subject/update/{class_id}', [AssignSubjectController::class,
 
 Route::get('assign/subject/details/{class_id}/{section_id?}', [AssignSubjectController::class, 'DetailsAssignSubject'])->name('assign.subject.details');
 
+Route::get('assign/subject/delete/{id}', [AssignSubjectController::class, 'DeleteAssignSubject'])->name('assign.subject.delete');
 
 // Assign Class Teacher Routes 
 Route::get('assign/class/teacher/view', [AssignClassTeacherController::class, 'ViewAssignTeacher'])->name('assign.class.teacher.view');

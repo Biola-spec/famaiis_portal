@@ -9,8 +9,22 @@ use App\Models\Role;
 
 class UserController extends Controller
 {
-    public function UserView(){
-    	$data['allData'] = User::with('roles')->paginate(25);
+    public function UserView(Request $request){
+        $selectedRole = $request->query('role');
+        $query = User::with('roles');
+
+        if ($selectedRole) {
+            $query->where(function($q) use ($selectedRole) {
+                $q->whereHas('roles', function($roleQuery) use ($selectedRole) {
+                    $roleQuery->where('name', $selectedRole);
+                })
+                ->orWhere('role', $selectedRole)
+                ->orWhere('usertype', $selectedRole);
+            });
+        }
+
+        $data['allData'] = $query->paginate(25)->appends($request->all());
+        $data['roles'] = Role::all();
     	return view('backend.user.view_user',$data);
     }
 

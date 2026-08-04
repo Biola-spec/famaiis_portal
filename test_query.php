@@ -6,24 +6,13 @@ $kernel->handle(Illuminate\Http\Request::capture());
 
 echo "Booted!\n";
 
+use App\Models\Role;
 
-use App\Models\User;
-use Illuminate\Support\Facades\Schema;
-
-echo "Columns:\n";
-print_r(Schema::getColumnListing('users'));
-
-
-$students = User::where('usertype', 'Student')->get();
-
-echo "Total students: " . $students->count() . "\n";
-$with_image = 0;
-foreach ($students as $student) {
-    if ($student->image) {
-        $with_image++;
-        echo "ID: {$student->id}, Name: {$student->name}, Image: {$student->image}\n";
-    }
+$roles = Role::all();
+foreach ($roles as $role) {
+    echo "ID: {$role->id}, Name: {$role->name}\n";
 }
-echo "Students with image: $with_image\n";
+
+
 
 

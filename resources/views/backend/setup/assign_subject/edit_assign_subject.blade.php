@@ -19,10 +19,13 @@
     }
 
     .teacher-add {
-        width: 38px;
+        width: 32px;
         height: 36px;
         padding: 0;
-        line-height: 34px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
     }
 
     .selected-teachers {
@@ -116,7 +119,7 @@
 @foreach($editData as $rowIndex => $edit)
 @php
     // Normalize assigned teacher ids to an array in all cases (array, collection, json string, comma list)
-    $assignedTeacherIds = $edit->assigned_teacher_ids ?? ($edit->teacher_id ? [$edit->teacher_id] : []);
+    $assignedTeacherIds = !empty($edit->assigned_teacher_ids) ? $edit->assigned_teacher_ids : ($edit->teacher_id ? [$edit->teacher_id] : []);
 
     if (is_string($assignedTeacherIds)) {
         $decoded = json_decode($assignedTeacherIds, true);
@@ -452,7 +455,7 @@
 
         $('form').on('submit', function(event) {
             var valid = true;
-            $('.teacher-select').each(function() {
+            $(this).find('.teacher-select').each(function() {
                 var selectedCount = $(this).find('option:selected').filter(function() {
                     return $(this).val() !== '';
                 }).length;

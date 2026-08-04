@@ -77,6 +77,7 @@
 				<th>Full Mark</th>
 				<th>Pass Mark</th>
 				<th>Subjective Mark</th>
+				<th width="18%">Action</th>
 			</tr>
 		</thead>
 		<tbody>
@@ -96,6 +97,10 @@
 				<td>{{ $assignment->full_mark }}</td>
 				<td>{{ $assignment->pass_mark }}</td>
 				<td>{{ $assignment->subjective_mark }}</td>
+				<td>
+					<a href="{{ route('assign.subject.edit', ['class_id' => $assignment->class_id, 'section_id' => $assignment->section_id]) }}" class="btn btn-sm btn-info">Edit</a>
+					<a href="{{ route('assign.subject.delete', $assignment->id) }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this assignment?');">Delete</a>
+				</td>
 			</tr>
 			@empty
 			<tr>

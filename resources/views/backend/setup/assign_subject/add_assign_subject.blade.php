@@ -19,10 +19,13 @@
     }
 
     .teacher-add {
-        width: 38px;
+        width: 32px;
         height: 36px;
         padding: 0;
-        line-height: 34px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
     }
 
     .selected-teachers {
@@ -371,6 +374,11 @@
             var $picker = $(this).closest('.teacher-picker').parent();
             var $select = $picker.find('.teacher-picker-select');
             addTeacher($picker, $select.val(), $select.find('option:selected').text());
+        });
+
+        $(document).on('change', '.teacher-picker-select', function() {
+            var $picker = $(this).closest('.teacher-picker').parent();
+            addTeacher($picker, $(this).val(), $(this).find('option:selected').text());
         });
 
         $(document).on('click', '.remove-teacher', function() {

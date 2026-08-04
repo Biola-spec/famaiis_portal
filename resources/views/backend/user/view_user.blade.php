@@ -21,8 +21,25 @@
 	<a href="{{ route('users.add') }}" style="float: right;" class="btn btn-rounded btn-success mb-5"> Add User</a>			  
 
 				</div>
-				<!-- /.box-header -->
 				<div class="box-body">
+					<form method="GET" action="{{ route('users.view') }}" class="mb-4">
+						<div class="row align-items-end">
+							<div class="col-md-4 col-12">
+								<div class="form-group mb-0">
+									<label for="role_filter" class="font-weight-bold">Filter by Role</label>
+									<select name="role" id="role_filter" class="form-control">
+										<option value="">All Roles</option>
+										@foreach($roles as $role)
+											<option value="{{ $role->name }}" {{ request('role') == $role->name ? 'selected' : '' }}>{{ $role->name }}</option>
+										@endforeach
+									</select>
+								</div>
+							</div>
+							<div class="col-md-2 col-12 mt-2 mt-md-0">
+								<button type="submit" class="btn btn-primary btn-block">Filter</button>
+							</div>
+						</div>
+					</form>
 					<div class="table-responsive">
 					  <table id="example1" class="table table-bordered table-striped">
 						<thead>
