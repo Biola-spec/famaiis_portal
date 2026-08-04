@@ -115,7 +115,23 @@
 
 @foreach($editData as $rowIndex => $edit)
 @php
-    $assignedTeacherIds = $edit->assigned_teacher_ids ?? array_filter([$edit->teacher_id]);
+    // Normalize assigned teacher ids to an array in all cases (array, collection, json string, comma list)
+    $assignedTeacherIds = $edit->assigned_teacher_ids ?? ($edit->teacher_id ? [$edit->teacher_id] : []);
+
+    if (is_string($assignedTeacherIds)) {
+        $decoded = json_decode($assignedTeacherIds, true);
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            $assignedTeacherIds = $decoded;
+        } else {
+            $assignedTeacherIds = array_filter(array_map('trim', explode(',', $assignedTeacherIds)));
+        }
+    } elseif ($assignedTeacherIds instanceof \Illuminate\Support\Collection) {
+        $assignedTeacherIds = $assignedTeacherIds->toArray();
+    } elseif (!is_array($assignedTeacherIds)) {
+        $assignedTeacherIds = (array) $assignedTeacherIds;
+    }
+
+    $assignedTeacherIds = array_values(array_filter($assignedTeacherIds));
 @endphp
   <div class="delete_whole_extra_item_add" id="delete_whole_extra_item_add">
         <div class="row">
@@ -346,6 +362,28 @@
             $picker.find('.teacher-picker-select').val('');
         }
 
+        function initializeTeacherPicker($picker) {
+            var $hiddenSelect = $picker.find('.teacher-select');
+            var $selectedTeachers = $picker.find('.selected-teachers');
+            $selectedTeachers.empty();
+
+            $hiddenSelect.find('option:selected').each(function() {
+                var value = $(this).val();
+                if (value === '') {
+                    return;
+                }
+                var name = $(this).text();
+                $selectedTeachers.append(
+                    '<span class="teacher-chip" data-teacher-id="' + value + '">' +
+                        name +
+                        '<button type="button" class="remove-teacher" title="Remove teacher">&times;</button>' +
+                    '</span>'
+                );
+            });
+
+            refreshTeacherPicker($picker);
+        }
+
         function addTeacher($picker, teacherId, teacherName) {
             if (!teacherId) {
                 return;
@@ -367,10 +405,19 @@
             refreshTeacherPicker($picker);
         }
 
+        $('.teacher-picker').each(function() {
+            initializeTeacherPicker($(this).closest('.controls'));
+        });
+
         $(document).on('click', '.teacher-add', function() {
-            var $picker = $(this).closest('.teacher-picker').parent();
+            var $picker = $(this).closest('.controls');
             var $select = $picker.find('.teacher-picker-select');
             addTeacher($picker, $select.val(), $select.find('option:selected').text());
+        });
+
+        $(document).on('change', '.teacher-picker-select', function() {
+            var $picker = $(this).closest('.controls');
+            addTeacher($picker, $(this).val(), $(this).find('option:selected').text());
         });
 
         $(document).on('click', '.remove-teacher', function() {
@@ -388,8 +435,9 @@
                 var selectedCount = $(this).find('option:selected').filter(function() {
                     return $(this).val() !== '';
                 }).length;
+                var chipCount = $(this).closest('.controls').find('.selected-teachers .teacher-chip').length;
 
-                if (selectedCount === 0) {
+                if (selectedCount === 0 && chipCount === 0) {
                     valid = false;
                     $(this).closest('.controls').find('.teacher-picker').css('border-color', '#e66767');
                 } else {
