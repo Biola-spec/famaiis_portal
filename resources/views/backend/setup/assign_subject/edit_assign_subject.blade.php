@@ -365,6 +365,16 @@
         function initializeTeacherPicker($picker) {
             var $hiddenSelect = $picker.find('.teacher-select');
             var $selectedTeachers = $picker.find('.selected-teachers');
+            // Debug: print current server-rendered state
+            try {
+                console.log('initializeTeacherPicker start', {
+                    picker: $picker.get(0),
+                    hiddenSelected: $hiddenSelect.find('option:selected').map(function(){ return $(this).val(); }).get(),
+                    serverChips: $selectedTeachers.find('.teacher-chip').map(function(){ return $(this).data('teacher-id'); }).get()
+                });
+            } catch (e) {
+                console && console.log && console.log('init picker debug error', e);
+            }
 
             // If server rendered chips already exist, prefer them and ensure the hidden select matches.
             var existingChips = $selectedTeachers.find('.teacher-chip');
