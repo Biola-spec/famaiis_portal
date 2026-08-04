@@ -365,22 +365,33 @@
         function initializeTeacherPicker($picker) {
             var $hiddenSelect = $picker.find('.teacher-select');
             var $selectedTeachers = $picker.find('.selected-teachers');
-            $selectedTeachers.empty();
 
-            $hiddenSelect.find('option:selected').each(function() {
-                var value = $(this).val();
-                if (value === '') {
-                    return;
-                }
-                var name = $(this).text();
-                $selectedTeachers.append(
-                    '<span class="teacher-chip" data-teacher-id="' + value + '">' +
-                        name +
-                        '<button type="button" class="remove-teacher" title="Remove teacher">&times;</button>' +
-                    '</span>'
-                );
-            });
+            // If server rendered chips already exist, prefer them and ensure the hidden select matches.
+            var existingChips = $selectedTeachers.find('.teacher-chip');
+            if (existingChips.length > 0) {
+                // Sync hidden select to chips
+                existingChips.each(function() {
+                    var id = String($(this).data('teacher-id'));
+                    $hiddenSelect.find('option[value="' + id + '"]').prop('selected', true);
+                });
+            } else {
+                // No server chips, populate chips from selected options
+                $hiddenSelect.find('option:selected').each(function() {
+                    var value = String($(this).val());
+                    if (value === '') {
+                        return;
+                    }
+                    var name = $(this).text();
+                    $selectedTeachers.append(
+                        '<span class="teacher-chip" data-teacher-id="' + value + '">' +
+                            name +
+                            '<button type="button" class="remove-teacher" title="Remove teacher">&times;</button>' +
+                        '</span>'
+                    );
+                });
+            }
 
+            // Ensure disabled state and reset picker
             refreshTeacherPicker($picker);
         }
 
