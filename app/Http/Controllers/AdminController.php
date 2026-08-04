@@ -42,6 +42,16 @@ class AdminController extends Controller
                 $data['teacher_total_students'] = 0;
                 $data['teacher_students'] = collect([]);
             }
+
+            // Calculate teacher's total subjects and classes taking
+            $teacherAssignments = \App\Models\TeacherAssignment::where('teacher_id', $user->id)->get();
+            $assignSubjects = \App\Models\AssignSubject::where('teacher_id', $user->id)->get();
+
+            $teacherClassIds = $teacherAssignments->pluck('class_id')->concat($assignSubjects->pluck('class_id'))->filter()->unique();
+            $teacherSubjectIds = $teacherAssignments->pluck('subject_id')->concat($assignSubjects->pluck('subject_id'))->filter()->unique();
+
+            $data['teacher_total_classes'] = $teacherClassIds->count();
+            $data['teacher_total_subjects'] = $teacherSubjectIds->count();
             
             $data['upcoming_events'] = \App\Models\Event::where('event_date', '>=', date('Y-m-d'))
                 ->orderBy('event_date', 'asc')

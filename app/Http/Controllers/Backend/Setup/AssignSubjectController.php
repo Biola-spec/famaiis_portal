@@ -10,6 +10,8 @@ use App\Models\SchoolSection;
 use App\Models\AssignSubject;
 use App\Models\TeacherAssignment;
 use App\Models\User;
+use PDF;
+use Auth;
 
 class AssignSubjectController extends Controller
 {
@@ -269,8 +271,87 @@ public function UpdateAssignSubject(Request $request,$class_id){
         return $classId . '|' . $subjectId . '|' . ($sectionId ?: 'null');
     }
 
+    public function TeacherAssignmentPdf($teacher_id = null){
+        $teacherId = $teacher_id ?: Auth::id();
+        $teacher = User::with('designation')->findOrFail($teacherId);
 
+        $teacherAssignments = TeacherAssignment::with(['studentClass', 'subject', 'section'])
+            ->where('teacher_id', $teacherId)
+            ->get();
 
+        $assignSubjects = AssignSubject::with(['student_class', 'school_subject', 'section'])
+            ->where('teacher_id', $teacherId)
+            ->get();
+
+        $subjectsMap = collect();
+        $classesMap = collect();
+        $assignmentsList = collect();
+
+        foreach ($teacherAssignments as $ta) {
+            $className = $ta->studentClass->name ?? 'N/A';
+            $sectionName = $ta->section->name ?? 'All Sections';
+            $subjectName = $ta->subject->name ?? 'N/A';
+
+            if ($ta->studentClass) {
+                $classesMap->put($ta->class_id, $className);
+            }
+            if ($ta->subject) {
+                $subjectsMap->put($ta->subject_id, $subjectName);
+            }
+
+            $assignmentsList->push([
+                'class_name' => $className,
+                'section_name' => $sectionName,
+                'subject_name' => $subjectName,
+            ]);
+        }
+
+        foreach ($assignSubjects as $as) {
+            $className = $as->student_class->name ?? 'N/A';
+            $sectionName = $as->section->name ?? 'All Sections';
+            $subjectName = $as->school_subject->name ?? 'N/A';
+
+            if ($as->student_class) {
+                $classesMap->put($as->class_id, $className);
+            }
+            if ($as->school_subject) {
+                $subjectsMap->put($as->subject_id, $subjectName);
+            }
+
+            $exists = $assignmentsList->contains(function ($item) use ($className, $sectionName, $subjectName) {
+                return $item['class_name'] === $className && $item['section_name'] === $sectionName && $item['subject_name'] === $subjectName;
+            });
+
+            if (!$exists) {
+                $assignmentsList->push([
+                    'class_name' => $className,
+                    'section_name' => $sectionName,
+                    'subject_name' => $subjectName,
+                ]);
+            }
+        }
+
+        $data['teacher'] = $teacher;
+        $data['assignments'] = $assignmentsList;
+        $data['unique_subjects'] = $subjectsMap;
+        $data['unique_classes'] = $classesMap;
+        $data['total_subjects'] = $subjectsMap->count();
+        $data['total_classes'] = $classesMap->count();
+
+        $setting = \DB::table('primary_settings')->first() ?? \DB::table('site_settings')->first();
+        if (!$setting) {
+            $setting = (object)[
+                'school_name' => config('app.name', 'School Management System'),
+                'school_email' => 'info@school.com',
+                'logo' => null,
+            ];
+        }
+        $data['setting'] = $setting;
+
+        $pdf = PDF::loadView('backend.setup.assign_subject.teacher_assignment_pdf', $data);
+        $pdf->setEncryption('', 'pass', ['copy', 'print']);
+        return $pdf->stream('Teacher_Assignment_' . $teacher->name . '.pdf');
+    }
 
 }
  
