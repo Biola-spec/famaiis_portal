@@ -220,13 +220,20 @@
                         <input type="number" name="amount" class="form-control" placeholder="Enter amount" min="100" required>
                         <small class="form-text text-muted">Minimum funding amount is ₦ 100.00</small>
                     </div>
+                    <div class="form-group">
+                        <label>Payment Provider</label>
+                        <select name="provider" class="form-control">
+                            <option value="paystack">Paystack</option>
+                            <option value="flutterwave">Flutterwave</option>
+                        </select>
+                    </div>
                     <div class="alert alert-info">
-                        <i class="fa fa-info-circle mr-5"></i> In a live environment, you will be redirected to the payment gateway (Paystack/Flutterwave). For this version, funding is simulated.
+                        <i class="fa fa-info-circle mr-5"></i> You will be redirected to the selected gateway. Your wallet is credited only after server-side verification.
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Process Funding</button>
+                    <button type="submit" class="btn btn-primary">Proceed to Payment</button>
                 </div>
             </form>
         </div>

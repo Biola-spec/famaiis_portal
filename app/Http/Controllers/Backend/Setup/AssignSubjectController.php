@@ -272,7 +272,21 @@ public function UpdateAssignSubject(Request $request,$class_id){
     }
 
     public function TeacherAssignmentPdf($teacher_id = null){
-        $teacherId = $teacher_id ?: Auth::id();
+        $authUser = Auth::user();
+        if (!$authUser) {
+            abort(403, 'Unauthorized access.');
+        }
+
+        if ($teacher_id && $teacher_id != $authUser->id) {
+            if (!$authUser->hasRole('Admin', 'Super Admin', 'Accountant') && $authUser->role !== 'Admin' && $authUser->role !== 'Accountant') {
+                $teacherId = $authUser->id;
+            } else {
+                $teacherId = $teacher_id;
+            }
+        } else {
+            $teacherId = $authUser->id;
+        }
+
         $teacher = User::with('designation')->findOrFail($teacherId);
 
         $teacherAssignments = TeacherAssignment::with(['studentClass', 'subject', 'section'])

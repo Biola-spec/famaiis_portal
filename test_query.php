@@ -6,20 +6,24 @@ $kernel->handle(Illuminate\Http\Request::capture());
 
 echo "Booted!\n";
 
+
 use App\Models\User;
+use Illuminate\Support\Facades\Schema;
 
-$teacher = User::where('usertype', 'Teacher')
-    ->orWhere('role', 'Teacher')
-    ->orWhereHas('roles', function($q){
-        $q->where('name', 'Teacher');
-    })->first();
+echo "Columns:\n";
+print_r(Schema::getColumnListing('users'));
 
-if ($teacher) {
-    echo "Testing updated PDF template for Teacher ID: {$teacher->id} ({$teacher->name})\n";
-    $controller = new \App\Http\Controllers\Backend\Setup\AssignSubjectController();
-    $pdf = $controller->TeacherAssignmentPdf($teacher->id);
-    echo "PDF generated successfully! Output size: " . strlen($pdf) . " bytes\n";
-} else {
-    echo "No teacher found to test.\n";
+
+$students = User::where('usertype', 'Student')->get();
+
+echo "Total students: " . $students->count() . "\n";
+$with_image = 0;
+foreach ($students as $student) {
+    if ($student->image) {
+        $with_image++;
+        echo "ID: {$student->id}, Name: {$student->name}, Image: {$student->image}\n";
+    }
 }
+echo "Students with image: $with_image\n";
+
 

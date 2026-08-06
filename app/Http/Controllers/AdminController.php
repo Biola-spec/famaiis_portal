@@ -69,6 +69,11 @@ class AdminController extends Controller
                 ->orderByDesc('status')
                 ->orderBy('scheduled_at')
                 ->get();
+
+            $data['leave_requests'] = \App\Models\LeaveRequest::where('teacher_id', $user->id)
+                ->latest()
+                ->limit(5)
+                ->get();
             
             return view('admin.teacher_index', $data);
         }

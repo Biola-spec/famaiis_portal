@@ -30,19 +30,25 @@ class Wallet extends Model
     /**
      * Credit the wallet balance.
      */
-    public function credit($amount, $description, $performerId, $metadata = null)
+    public function credit($amount, $description, $performerId, $metadata = null, $referenceType = null, $referenceId = null)
     {
-        return DB::transaction(function () use ($amount, $description, $performerId, $metadata) {
-            $this->balance += $amount;
-            $this->save();
+        return DB::transaction(function () use ($amount, $description, $performerId, $metadata, $referenceType, $referenceId) {
+            $wallet = static::query()->whereKey($this->id)->lockForUpdate()->firstOrFail();
+            $wallet->balance += $amount;
+            $wallet->save();
 
-            return $this->transactions()->create([
-                'user_id' => $this->user_id,
+            $this->setRawAttributes($wallet->getAttributes(), true);
+
+            return $wallet->transactions()->create([
+                'user_id' => $wallet->user_id,
                 'amount' => $amount,
+                'balance_after' => $wallet->balance,
                 'type' => 'credit',
                 'description' => $description,
                 'performed_by' => $performerId,
                 'metadata' => $metadata,
+                'reference_type' => $referenceType,
+                'reference_id' => $referenceId,
             ]);
         });
     }
@@ -50,23 +56,30 @@ class Wallet extends Model
     /**
      * Debit the wallet balance.
      */
-    public function debit($amount, $description, $performerId, $metadata = null)
+    public function debit($amount, $description, $performerId, $metadata = null, $referenceType = null, $referenceId = null)
     {
-        if ($this->balance < $amount) {
-            throw new \Exception('Insufficient wallet balance.');
-        }
+        return DB::transaction(function () use ($amount, $description, $performerId, $metadata, $referenceType, $referenceId) {
+            $wallet = static::query()->whereKey($this->id)->lockForUpdate()->firstOrFail();
 
-        return DB::transaction(function () use ($amount, $description, $performerId, $metadata) {
-            $this->balance -= $amount;
-            $this->save();
+            if ($wallet->balance < $amount) {
+                throw new \Exception('Insufficient wallet balance.');
+            }
 
-            return $this->transactions()->create([
-                'user_id' => $this->user_id,
+            $wallet->balance -= $amount;
+            $wallet->save();
+
+            $this->setRawAttributes($wallet->getAttributes(), true);
+
+            return $wallet->transactions()->create([
+                'user_id' => $wallet->user_id,
                 'amount' => $amount,
+                'balance_after' => $wallet->balance,
                 'type' => 'debit',
                 'description' => $description,
                 'performed_by' => $performerId,
                 'metadata' => $metadata,
+                'reference_type' => $referenceType,
+                'reference_id' => $referenceId,
             ]);
         });
     }

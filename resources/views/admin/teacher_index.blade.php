@@ -78,6 +78,46 @@
             <div class="row">
                 @include('admin.body.events_widget')
             </div>
+
+            <div class="row">
+                <div class="col-12">
+                    <div class="box">
+                        <div class="box-header with-border d-flex justify-content-between align-items-center">
+                            <h4 class="box-title">My Leave Requests</h4>
+                            <a href="{{ route('leave.requests.index') }}" class="btn btn-sm btn-primary">View All</a>
+                        </div>
+                        <div class="box-body">
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Type</th>
+                                            <th>Dates</th>
+                                            <th>Status</th>
+                                            <th>Comment</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @php($badgeMap = ['pending' => 'warning', 'approved' => 'success', 'rejected' => 'danger', 'cancelled' => 'secondary'])
+                                        @forelse($leave_requests ?? collect() as $leaveRequest)
+                                            <tr>
+                                                <td>{{ $leaveRequest->leave_type }}</td>
+                                                <td>{{ $leaveRequest->start_date->format('M d, Y') }} - {{ $leaveRequest->end_date->format('M d, Y') }}</td>
+                                                <td><span class="badge badge-{{ $badgeMap[$leaveRequest->status] ?? 'secondary' }}">{{ ucfirst($leaveRequest->status) }}</span></td>
+                                                <td>{{ $leaveRequest->admin_comment ?: '-' }}</td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="4" class="text-center">No leave requests yet.</td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
             
             <div class="row">
                 <div class="col-12">

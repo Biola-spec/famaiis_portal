@@ -101,6 +101,25 @@
                     </div>
                     <div class="checkout-body">
                         @if($paymentSetting && $paymentSetting->bank_transfer_enabled && $paymentSetting->bank_name && $paymentSetting->account_number && $paymentSetting->account_name)
+                            @if(auth()->user()->hasRole('Admin') || auth()->user()->hasRole('Accountant') || auth()->user()->hasPermission('manage-shop'))
+                                <div class="bank-info" style="background: #eefdf5;">
+                                    <h6 style="font-weight: 700; font-size: 14px; color: #14532d; margin-bottom: 10px;">
+                                        <i class="ti-id-badge mr-1"></i> POS Student Wallet Sale
+                                    </h6>
+                                    <form action="{{ route('orders.store') }}" method="POST">
+                                        @csrf
+                                        <input type="hidden" name="payment_method" value="student_wallet">
+                                        <div style="margin-bottom: 12px;">
+                                            <label style="font-size: 13px; font-weight: 600; color: #555; margin-bottom: 4px; display: block;">Student ID <span style="color:#ef4444">*</span></label>
+                                            <input type="text" name="student_identifier" class="form-control" style="border-radius: 10px; border: 2px solid #cdebd9; padding: 10px 14px;" value="{{ old('student_identifier') }}" placeholder="Enter student ID" required>
+                                        </div>
+                                        <button type="submit" style="width: 100%; background: #16a34a; color: #fff; border: none; padding: 12px; border-radius: 10px; font-weight: 700; font-size: 14px; cursor: pointer;">
+                                            <i class="ti-check mr-1"></i> Debit Student Wallet
+                                        </button>
+                                    </form>
+                                </div>
+                            @endif
+
                             <div class="bank-info">
                                 <h6 style="font-weight: 700; font-size: 14px; color: #333; margin-bottom: 10px;">
                                     <i class="ti-credit-card mr-1" style="color: #764ba2;"></i> Transfer to School Account
@@ -117,6 +136,7 @@
 
                             <form action="{{ route('orders.store') }}" method="POST" enctype="multipart/form-data">
                                 @csrf
+                                <input type="hidden" name="payment_method" value="bank_transfer">
                                 <div style="margin-bottom: 12px;">
                                     <label style="font-size: 13px; font-weight: 600; color: #555; margin-bottom: 4px; display: block;">Transfer Reference <span style="color:#ef4444">*</span></label>
                                     <input type="text" name="transfer_reference" class="form-control" style="border-radius: 10px; border: 2px solid #e8e8e8; padding: 10px 14px;" value="{{ old('transfer_reference') }}" placeholder="Bank reference or narration" required>

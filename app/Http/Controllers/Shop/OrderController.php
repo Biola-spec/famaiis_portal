@@ -8,10 +8,12 @@ use App\Models\OrderItem;
 use App\Models\Cart;
 use App\Models\Product;
 use App\Models\PaymentSetting;
+use App\Models\Wallet;
 use Illuminate\Http\Request;
 use Barryvdh\DomPDF\Facade\Pdf;
 use App\Notifications\NewOrderNotification;
 use App\Notifications\OrderStatusNotification;
+use App\Notifications\InsufficientWalletFundsNotification;
 use App\Models\User;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\DB;
@@ -54,7 +56,7 @@ class OrderController extends Controller
     public function show(Order $order)
     {
         $this->authorize('view', $order);
-        $order->load('items.product', 'user', 'verifier');
+        $order->load('items.product', 'user', 'student', 'verifier');
         return view('shop.orders.show', compact('order'));
     }
 
@@ -65,8 +67,10 @@ class OrderController extends Controller
         $paymentSetting = PaymentSetting::first();
 
         $validated = $request->validate([
-            'transfer_reference' => 'required|string|max:255',
-            'transfer_receipt' => 'required|file|mimes:jpg,jpeg,png,pdf|max:4096',
+            'payment_method' => 'nullable|in:bank_transfer,student_wallet',
+            'student_identifier' => 'required_if:payment_method,student_wallet|nullable|string|max:100',
+            'transfer_reference' => 'required_unless:payment_method,student_wallet|nullable|string|max:255',
+            'transfer_receipt' => 'required_unless:payment_method,student_wallet|nullable|file|mimes:jpg,jpeg,png,pdf|max:4096',
         ]);
 
         if ($cartItems->isEmpty()) {
@@ -83,6 +87,12 @@ class OrderController extends Controller
                     'alert-type' => 'error',
                 ]);
             }
+        }
+
+        $paymentMethod = $validated['payment_method'] ?? 'bank_transfer';
+
+        if ($paymentMethod === 'student_wallet') {
+            return $this->storeStudentWalletOrder($validated, $cartItems, $user);
         }
 
         if (!$paymentSetting || !$paymentSetting->bank_transfer_enabled || !$paymentSetting->bank_name || !$paymentSetting->account_number || !$paymentSetting->account_name) {
@@ -256,5 +266,98 @@ class OrderController extends Controller
         if ($user->hasRole('Teacher')) return 'teacher';
         if ($user->hasRole('Student')) return 'student';
         return 'other';
+    }
+
+    private function storeStudentWalletOrder(array $validated, $cartItems, User $attendant)
+    {
+        abort_unless($attendant->hasRole('Admin', 'Accountant') || $attendant->hasPermission('manage-shop'), 403);
+
+        $student = User::query()
+            ->where('id', $validated['student_identifier'])
+            ->orWhere('id_no', $validated['student_identifier'])
+            ->first();
+
+        if (!$student || !$student->hasRole('Student')) {
+            return redirect()->back()->with([
+                'message' => 'Student ID was not found.',
+                'alert-type' => 'error',
+            ]);
+        }
+
+        $total = (float) $cartItems->sum(fn ($item) => $item->product->price * $item->quantity);
+
+        try {
+            $order = DB::transaction(function () use ($student, $attendant, $cartItems, $total) {
+                $wallet = Wallet::where('user_id', $student->id)->lockForUpdate()->first();
+                $balance = (float) ($wallet?->balance ?? 0);
+
+                if (!$wallet || $balance < $total) {
+                    $managers = User::whereHas('roles', fn ($query) => $query->whereIn('name', ['Admin', 'Accountant', 'Shop Manager', 'Manager']))
+                        ->orWhereIn('role', ['Admin', 'Accountant', 'Shop Manager', 'Manager'])
+                        ->get();
+
+                    Notification::send($managers, new InsufficientWalletFundsNotification($student, $total, $balance, $attendant));
+
+                    throw new \RuntimeException('Insufficient wallet balance for this student.');
+                }
+
+                $reference = 'SHOP-WALLET-' . now()->format('YmdHis') . '-' . Str::upper(Str::random(8));
+
+                $order = Order::create([
+                    'user_id' => $attendant->id,
+                    'student_id' => $student->id,
+                    'role_type' => 'student_wallet',
+                    'total_amount' => $total,
+                    'status' => 'completed',
+                    'payment_reference' => $reference,
+                    'payment_provider' => 'wallet',
+                    'payment_method' => 'student_wallet',
+                    'payment_status' => 'success',
+                    'paid_at' => Carbon::now(),
+                    'verified_by' => $attendant->id,
+                    'verified_at' => Carbon::now(),
+                ]);
+
+                foreach ($cartItems as $item) {
+                    $product = Product::whereKey($item->product_id)->lockForUpdate()->firstOrFail();
+
+                    if ($product->stock_quantity < $item->quantity) {
+                        throw new \RuntimeException("Insufficient stock for {$product->name}.");
+                    }
+
+                    OrderItem::create([
+                        'order_id' => $order->id,
+                        'product_id' => $item->product_id,
+                        'quantity' => $item->quantity,
+                        'price' => $item->product->price,
+                    ]);
+
+                    $product->decrement('stock_quantity', $item->quantity);
+                }
+
+                $wallet->debit(
+                    $total,
+                    'School shop purchase #' . $order->id,
+                    $attendant->id,
+                    ['order_id' => $order->id, 'student_id' => $student->id],
+                    Order::class,
+                    $order->id
+                );
+
+                Cart::where('user_id', $attendant->id)->delete();
+
+                return $order;
+            });
+        } catch (Throwable $e) {
+            return redirect()->back()->with([
+                'message' => $e->getMessage(),
+                'alert-type' => 'error',
+            ]);
+        }
+
+        return redirect()->route('orders.show', $order)->with([
+            'message' => 'Sale completed and student wallet debited successfully.',
+            'alert-type' => 'success',
+        ]);
     }
 }

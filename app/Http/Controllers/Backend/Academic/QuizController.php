@@ -96,6 +96,13 @@ class QuizController extends Controller
             'retake_limit' => 'required|integer|min:1',
         ]);
 
+        if (!$this->canUseClass((int) $request->class_id)) {
+            return redirect()->back()->with([
+                'message' => 'You can only create CBT exams for your assigned classes.',
+                'alert-type' => 'error',
+            ]);
+        }
+
         $quiz = Quiz::create([
             'class_id' => $request->class_id,
             'section_id' => $request->section_id,
@@ -117,6 +124,8 @@ class QuizController extends Controller
 
     public function edit(Quiz $quiz)
     {
+        $this->authorizeQuiz($quiz);
+
         $user = Auth::user();
         if ($user->hasRole('Admin') || $user->role === 'Admin') {
             $classes = StudentClass::query()->orderBy('name')->get();
@@ -147,6 +156,8 @@ class QuizController extends Controller
 
     public function update(Request $request, Quiz $quiz)
     {
+        $this->authorizeQuiz($quiz);
+
         $request->validate([
             'class_id' => 'required|exists:student_classes,id',
             'section_id' => 'nullable|exists:school_sections,id',
@@ -156,6 +167,13 @@ class QuizController extends Controller
             'duration' => 'required|integer|min:1',
             'retake_limit' => 'required|integer|min:1',
         ]);
+
+        if (!$this->canUseClass((int) $request->class_id)) {
+            return redirect()->back()->with([
+                'message' => 'You can only assign CBT exams to your assigned classes.',
+                'alert-type' => 'error',
+            ]);
+        }
 
         $quiz->update($request->all());
 
@@ -167,6 +185,8 @@ class QuizController extends Controller
 
     public function show(Quiz $quiz)
     {
+        $this->authorizeQuiz($quiz);
+
         $quiz->load(['student_class', 'subject', 'questions', 'attempts.student', 'retakes.student', 'retakes.teacher']);
         
         return view('backend.academic.cbt.show', compact('quiz'));
@@ -174,6 +194,8 @@ class QuizController extends Controller
 
     public function addQuestion(Request $request, Quiz $quiz)
     {
+        $this->authorizeQuiz($quiz);
+
         $request->validate([
             'question' => 'required|string',
             'option_a' => 'required|string',
@@ -214,6 +236,8 @@ class QuizController extends Controller
 
     public function addPassage(Request $request, Quiz $quiz)
     {
+        $this->authorizeQuiz($quiz);
+
         $request->validate([
             'content' => 'required|string',
             'start_number' => 'required|integer',
@@ -241,6 +265,8 @@ class QuizController extends Controller
 
     public function deletePassage(Passage $passage)
     {
+        $this->authorizeQuiz($passage->quiz);
+
         $passage->delete();
         return redirect()->back()->with([
             'message' => 'Passage deleted successfully.',
@@ -251,11 +277,15 @@ class QuizController extends Controller
     public function editQuestion(Question $question)
     {
         $quiz = $question->quiz;
+        $this->authorizeQuiz($quiz);
+
         return view('backend.academic.cbt.edit_question', compact('question', 'quiz'));
     }
 
     public function updateQuestion(Request $request, Question $question)
     {
+        $this->authorizeQuiz($question->quiz);
+
         $request->validate([
             'question' => 'required|string',
             'option_a' => 'required|string',
@@ -301,11 +331,15 @@ class QuizController extends Controller
     public function editPassage(Passage $passage)
     {
         $quiz = $passage->quiz;
+        $this->authorizeQuiz($quiz);
+
         return view('backend.academic.cbt.edit_passage', compact('passage', 'quiz'));
     }
 
     public function updatePassage(Request $request, Passage $passage)
     {
+        $this->authorizeQuiz($passage->quiz);
+
         $request->validate([
             'content' => 'required|string',
             'start_number' => 'required|integer',
@@ -336,6 +370,8 @@ class QuizController extends Controller
 
     public function allowRetake(QuizAttempt $attempt)
     {
+        $this->authorizeQuiz($attempt->quiz);
+
         // Log the retake action
         \App\Models\QuizRetake::create([
             'quiz_id' => $attempt->quiz_id,
@@ -358,11 +394,15 @@ class QuizController extends Controller
 
     public function import(Quiz $quiz)
     {
+        $this->authorizeQuiz($quiz);
+
         return view('backend.academic.cbt.import', compact('quiz'));
     }
 
     public function processImport(Request $request, Quiz $quiz)
     {
+        $this->authorizeQuiz($quiz);
+
         $request->validate([
             'word_file' => 'required|mimes:docx|max:10240',
         ]);
@@ -532,6 +572,8 @@ class QuizController extends Controller
 
     public function deleteQuestion(Question $question)
     {
+        $this->authorizeQuiz($question->quiz);
+
         $question->delete();
         return redirect()->back()->with([
             'message' => 'Question deleted successfully.',
@@ -541,6 +583,8 @@ class QuizController extends Controller
 
     public function updateStatus(Request $request, Quiz $quiz)
     {
+        $this->authorizeQuiz($quiz);
+
         $request->validate(['status' => 'required|in:published,locked']);
         
         if ($request->status === 'published' && $quiz->questions()->count() === 0) {
@@ -556,5 +600,29 @@ class QuizController extends Controller
             'message' => 'Quiz status updated to ' . $request->status,
             'alert-type' => 'success'
         ]);
+    }
+
+    private function authorizeQuiz(Quiz $quiz): void
+    {
+        $user = Auth::user();
+
+        if ($user->hasRole('Admin') || $user->role === 'Admin') {
+            return;
+        }
+
+        abort_unless((int) $quiz->created_by === (int) $user->id && $this->canUseClass((int) $quiz->class_id), 403);
+    }
+
+    private function canUseClass(int $classId): bool
+    {
+        $user = Auth::user();
+
+        if ($user->hasRole('Admin') || $user->role === 'Admin') {
+            return true;
+        }
+
+        return TeacherAssignment::where('teacher_id', $user->id)->where('class_id', $classId)->exists()
+            || \App\Models\AssignClassTeacher::where('teacher_id', $user->id)->where('class_id', $classId)->exists()
+            || \App\Models\AssignSubject::where('teacher_id', $user->id)->where('class_id', $classId)->exists();
     }
 }

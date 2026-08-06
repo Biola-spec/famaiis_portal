@@ -48,12 +48,18 @@
                             <p class="text-sm text-gray-500">Role</p>
                             <p class="font-bold text-gray-900 capitalize">{{ $order->role_type }}</p>
                         </div>
+                        @if($order->student)
+                        <div>
+                            <p class="text-sm text-gray-500">Student</p>
+                            <p class="font-bold text-gray-900">{{ $order->student->name }} ({{ $order->student->id_no ?? $order->student->id }})</p>
+                        </div>
+                        @endif
                     </div>
                 </div>
                 @endif
 
                 <div class="mb-12 p-6 bg-blue-50 rounded-2xl border border-blue-100">
-                    <h4 class="text-xs uppercase tracking-widest text-blue-500 mb-4">Bank Transfer Verification</h4>
+                    <h4 class="text-xs uppercase tracking-widest text-blue-500 mb-4">Payment Verification</h4>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <p class="text-sm text-gray-500">Payment Method</p>

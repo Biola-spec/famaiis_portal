@@ -60,6 +60,22 @@
             <span>{{ __('ui.my_wallet') }}</span>
           </a>
         </li>
+
+        <li class="{{ ($route == 'event.view')?'active':'' }}">
+          <a href="{{ route('event.view') }}">
+            <i data-feather="calendar"></i>
+            <span>Calendar</span>
+          </a>
+        </li>
+
+        @if($is_admin || $is_teacher)
+        <li class="{{ str_starts_with($route ?? '', 'leave.requests.')?'active':'' }}">
+          <a href="{{ route('leave.requests.index') }}">
+            <i data-feather="clock"></i>
+            <span>{{ $is_admin ? 'Leave Requests' : 'My Leave Requests' }}</span>
+          </a>
+        </li>
+        @endif
 		
 
 

@@ -15,10 +15,12 @@
 
 			<div class="col-12">
 
-			 <div class="box">
+	<div class="box">
 				<div class="box-header with-border">
 				  <h3 class="box-title">Upcoming Events List</h3>
+	@if(Auth::user()->hasRole('Admin'))
 	<a href="{{ route('event.add') }}" style="float: right;" class="btn btn-rounded btn-success mb-5"> Add Event</a>			  
+	@endif
 
 				</div>
 				<!-- /.box-header -->
@@ -33,7 +35,9 @@
 				<th>Location</th>
 				<th>Section</th>
 				<th>Notified</th>
+				@if(Auth::user()->hasRole('Admin'))
 				<th width="25%">Action</th>
+				@endif
 				 
 			</tr>
 		</thead>
@@ -55,12 +59,14 @@
 					<span class="badge badge-danger">No</span>
 					@endif
 				</td>
+				@if(Auth::user()->hasRole('Admin'))
 				<td>
 <a href="{{ route('event.edit',$event->id) }}" class="btn btn-info" title="Edit"><i class="fa fa-edit"></i></a>
 <a href="{{ route('event.registrations.view',$event->id) }}" class="btn btn-primary" title="View Registrations"><i class="fa fa-users"></i></a>
 <a href="{{ route('event.delete',$event->id) }}" class="btn btn-danger" id="delete" title="Delete"><i class="fa fa-trash"></i></a>
 
 				</td>
+				@endif
 				 
 			</tr>
 			@endforeach

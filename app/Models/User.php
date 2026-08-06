@@ -235,6 +235,11 @@ class User extends Authenticatable
         return $this->hasOne(Wallet::class);
     }
 
+    public function leaveRequests(): HasMany
+    {
+        return $this->hasMany(LeaveRequest::class, 'teacher_id');
+    }
+
     public function resultLinks(): HasMany
     {
         return $this->hasMany(ParentResultLink::class, 'parent_id');

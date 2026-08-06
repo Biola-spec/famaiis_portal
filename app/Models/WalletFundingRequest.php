@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class WalletTransaction extends Model
+class WalletFundingRequest extends Model
 {
     use HasFactory;
 
@@ -13,17 +13,19 @@ class WalletTransaction extends Model
         'wallet_id',
         'user_id',
         'amount',
-        'balance_after',
-        'type',
-        'description',
-        'performed_by',
-        'metadata',
-        'reference_type',
-        'reference_id',
+        'provider',
+        'reference',
+        'transaction_id',
+        'status',
+        'payment_method',
+        'paid_at',
+        'provider_payload',
     ];
 
     protected $casts = [
-        'metadata' => 'array',
+        'amount' => 'decimal:2',
+        'paid_at' => 'datetime',
+        'provider_payload' => 'array',
     ];
 
     public function wallet()
@@ -34,10 +36,5 @@ class WalletTransaction extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
-    }
-
-    public function performer()
-    {
-        return $this->belongsTo(User::class, 'performed_by');
     }
 }

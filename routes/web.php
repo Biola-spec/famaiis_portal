@@ -20,6 +20,7 @@ use App\Http\Controllers\Backend\ParentResultLinkController;
 use App\Http\Controllers\Backend\ParentController;
 use App\Models\SiteSetting;
 use App\Http\Controllers\Backend\EventController;
+use App\Http\Controllers\Backend\LeaveRequestController;
 
 use App\Http\Controllers\Backend\Student\StudentRegController;
 use App\Http\Controllers\Backend\Student\StudentRollController;
@@ -70,6 +71,8 @@ use App\Http\Controllers\Backend\LearnHub\LearnHubController;
 */
 
 Route::middleware(['auth'])->get('/dashboard', [AdminController::class, 'Index'])->name('dashboard');
+Route::post('/wallet/fund/paystack-webhook', [\App\Http\Controllers\Backend\Wallet\WalletFundingController::class, 'paystackWebhook'])->name('wallet.fund.paystack.webhook');
+Route::middleware(['auth'])->get('teacher/assignment/pdf/{teacher_id?}', [AssignSubjectController::class, 'TeacherAssignmentPdf'])->name('assign.subject.teacher.pdf');
 Route::middleware(['auth', 'role:Admin'])->get('/admin', function () {
     return redirect()->route('dashboard');
 })->name('admin.dashboard');
@@ -168,14 +171,25 @@ Route::post('/password/update', [ProfileController::class, 'PasswordUpdate'])->n
 }); 
 
 // Event Management Routes
-Route::prefix('events')->middleware('role:Admin')->group(function(){
+Route::prefix('events')->group(function(){
     Route::get('/view', [EventController::class, 'ViewEvent'])->name('event.view');
-    Route::get('/add', [EventController::class, 'AddEvent'])->name('event.add');
-    Route::post('/store', [EventController::class, 'StoreEvent'])->name('event.store');
-    Route::get('/edit/{id}', [EventController::class, 'EditEvent'])->name('event.edit');
-    Route::post('/update/{id}', [EventController::class, 'UpdateEvent'])->name('event.update');
-    Route::get('/delete/{id}', [EventController::class, 'DeleteEvent'])->name('event.delete');
-    Route::get('/registrations/{event_id}', [EventController::class, 'ViewRegistrations'])->name('event.registrations.view');
+    Route::middleware('role:Admin')->group(function () {
+        Route::get('/add', [EventController::class, 'AddEvent'])->name('event.add');
+        Route::post('/store', [EventController::class, 'StoreEvent'])->name('event.store');
+        Route::get('/edit/{id}', [EventController::class, 'EditEvent'])->name('event.edit');
+        Route::post('/update/{id}', [EventController::class, 'UpdateEvent'])->name('event.update');
+        Route::get('/delete/{id}', [EventController::class, 'DeleteEvent'])->name('event.delete');
+        Route::get('/registrations/{event_id}', [EventController::class, 'ViewRegistrations'])->name('event.registrations.view');
+    });
+});
+
+Route::middleware('role:Admin,Teacher,Staff')->prefix('leave-requests')->name('leave.requests.')->group(function () {
+    Route::get('/', [LeaveRequestController::class, 'index'])->name('index');
+    Route::get('/create', [LeaveRequestController::class, 'create'])->name('create');
+    Route::post('/', [LeaveRequestController::class, 'store'])->name('store');
+    Route::get('/{leaveRequest}/download', [LeaveRequestController::class, 'download'])->name('download');
+    Route::post('/{leaveRequest}/status', [LeaveRequestController::class, 'updateStatus'])->name('status');
+    Route::post('/{leaveRequest}/cancel', [LeaveRequestController::class, 'cancel'])->name('cancel');
 });
 
 
@@ -318,7 +332,6 @@ Route::post('assign/subject/update/{class_id}', [AssignSubjectController::class,
 Route::get('assign/subject/details/{class_id}/{section_id?}', [AssignSubjectController::class, 'DetailsAssignSubject'])->name('assign.subject.details');
 
 Route::get('assign/subject/delete/{id}', [AssignSubjectController::class, 'DeleteAssignSubject'])->name('assign.subject.delete');
-Route::get('assign/subject/teacher/pdf/{teacher_id?}', [AssignSubjectController::class, 'TeacherAssignmentPdf'])->name('assign.subject.teacher.pdf');
 
 // Assign Class Teacher Routes 
 Route::get('assign/class/teacher/view', [AssignClassTeacherController::class, 'ViewAssignTeacher'])->name('assign.class.teacher.view');
@@ -805,7 +818,8 @@ Route::prefix('wallet')->group(function(){
     Route::get('/history', [App\Http\Controllers\Backend\Wallet\WalletController::class, 'WalletHistory'])->name('wallet.history');
     Route::get('/pay-fees', [App\Http\Controllers\Backend\Wallet\WalletController::class, 'PayFeesView'])->name('wallet.pay_fees');
     Route::post('/pay-fees/store', [App\Http\Controllers\Backend\Wallet\WalletController::class, 'PayFeesStore'])->name('wallet.pay_fees.store');
-    Route::post('/fund', [App\Http\Controllers\Backend\Wallet\WalletController::class, 'FundWalletStore'])->name('wallet.fund.store');
+    Route::post('/fund', [App\Http\Controllers\Backend\Wallet\WalletFundingController::class, 'initialize'])->name('wallet.fund.store');
+    Route::get('/fund/callback', [App\Http\Controllers\Backend\Wallet\WalletFundingController::class, 'callback'])->name('wallet.fund.callback');
     Route::get('/get-student-fees/{student_id}', [App\Http\Controllers\Backend\Wallet\WalletController::class, 'GetStudentFees'])->name('wallet.get_student_fees');
     
     // Admin Wallet Routes
