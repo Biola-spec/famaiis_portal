@@ -89,10 +89,19 @@ class AppServiceProvider extends ServiceProvider
                         $headerSections = collect();
                     }
 
+                    $unreadMessageCount = 0;
+                    if (\Illuminate\Support\Facades\Schema::hasTable('messages')) {
+                        try {
+                            $unreadMessageCount = \App\Models\Message::where('receiver_id', $user->id)
+                                ->whereNull('seen_at')
+                                ->count();
+                        } catch (\Throwable $e) {
+                            $unreadMessageCount = 0;
+                        }
+                    }
+
                     $adminChrome = [
-                        'unreadMessageCount' => \App\Models\Message::where('receiver_id', $user->id)
-                            ->whereNull('seen_at')
-                            ->count(),
+                        'unreadMessageCount' => $unreadMessageCount,
                         'unreadNotifications' => $user->unreadNotifications()->latest()->limit(8)->get(),
                         'unreadNotificationCount' => $user->unreadNotifications()->count(),
                         'headerSections' => $headerSections,
