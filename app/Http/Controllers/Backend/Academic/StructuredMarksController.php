@@ -539,4 +539,228 @@ class StructuredMarksController extends Controller
 
         return $grade?->grade_name;
     }
+
+    public function exportExcel(Request $request)
+    {
+        $validated = $request->validate([
+            'class_id' => 'required|exists:student_classes,id',
+            'section_id' => 'nullable|exists:school_sections,id',
+            'subject_id' => 'required|exists:school_subjects,id',
+            'term' => ['required', Rule::in(['1st Term', '2nd Term', '3rd Term'])],
+        ]);
+
+        $session = getCurrentSession();
+        $class = StudentClass::find($validated['class_id']);
+        $subject = SchoolSubject::find($validated['subject_id']);
+
+        $setting = ClassMarkingSetting::query()
+            ->where('class_id', $validated['class_id'])
+            ->where(function ($query) use ($validated) {
+                $query->whereNull('section_id')->orWhere('section_id', $validated['section_id']);
+            })
+            ->where(function ($query) use ($validated) {
+                $query->whereNull('subject_id')->orWhere('subject_id', $validated['subject_id']);
+            })
+            ->where(function ($query) use ($session) {
+                $query->whereNull('session_id')->orWhere('session_id', optional($session)->id);
+            })
+            ->where(function ($query) use ($validated) {
+                $query->whereNull('term')->orWhere('term', $validated['term']);
+            })
+            ->where('is_active', true)
+            ->orderByDesc('term')
+            ->first();
+
+        if (!$setting) {
+            return back()->with('error', 'No class marking setting found for this class/subject.');
+        }
+
+        $studentQuery = AssignStudent::query()
+            ->with('student')
+            ->whereHas('student')
+            ->where('year_id', optional($session)->id)
+            ->where('class_id', $validated['class_id']);
+
+        if (!empty($validated['section_id'])) {
+            $studentIds = StudentSection::where('section_id', $validated['section_id'])->pluck('student_id');
+            $studentQuery->whereIn('student_id', $studentIds);
+        }
+
+        $students = $studentQuery->get();
+        if ($students->isEmpty()) {
+            $students = AssignStudent::query()
+                ->with('student')
+                ->whereHas('student')
+                ->where('class_id', $validated['class_id'])
+                ->get();
+        }
+
+        $existingQuery = StudentMarks::query()
+            ->where('class_id', $validated['class_id'])
+            ->where('subject_id', $validated['subject_id'])
+            ->where('session_id', optional($session)->id)
+            ->where('term', $validated['term']);
+
+        if (!empty($validated['section_id'])) {
+            $existingQuery->where('section_id', $validated['section_id']);
+        }
+
+        $existing = $existingQuery->get()->keyBy('student_id');
+
+        $cleanClassName = preg_replace('/[^A-Za-z0-9_\-]/', '_', $class->name ?? 'Class');
+        $cleanSubjectName = preg_replace('/[^A-Za-z0-9_\-]/', '_', $subject->name ?? 'Subject');
+        $cleanTerm = preg_replace('/[^A-Za-z0-9_\-]/', '_', $validated['term']);
+        $filename = "Marks_{$cleanClassName}_{$cleanSubjectName}_{$cleanTerm}.csv";
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0'
+        ];
+
+        $callback = function () use ($setting, $students, $existing) {
+            $file = fopen('php://output', 'w');
+            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF)); // UTF-8 BOM for Excel
+
+            $headerRow = ['Student ID', 'ID No', 'Student Name', 'Gender'];
+            $ordinals = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'];
+            $customLabels = $setting->ca_labels ?? [];
+            $caCount = (int) ($setting->ca_count ?? 1);
+
+            for ($i = 0; $i < $caCount; $i++) {
+                $lbl = $customLabels[$i] ?? (($ordinals[$i] ?? ($i + 1)) . " CA");
+                $maxW = $setting->ca_weights[$i] ?? '';
+                $headerRow[] = $maxW ? "{$lbl} (Max {$maxW})" : $lbl;
+            }
+
+            $examMax = $setting->exam_weight ?? 100;
+            $headerRow[] = ($setting->exam_label ?? 'Exam') . " (Max {$examMax})";
+
+            if (!empty($setting->project_enabled)) {
+                $headerRow[] = "Project (Max 100)";
+            }
+
+            fputcsv($file, $headerRow);
+
+            foreach ($students as $assigned) {
+                $st = $assigned->student;
+                if (!$st) continue;
+
+                $saved = $existing->get($assigned->student_id);
+                $existingCa = $saved ? ($saved->ca_breakdown ?? []) : [];
+
+                $row = [
+                    $assigned->student_id,
+                    $st->id_no ?? '',
+                    $st->name ?? '',
+                    $st->gender ?? ''
+                ];
+
+                for ($i = 0; $i < $caCount; $i++) {
+                    $row[] = isset($existingCa[$i]) && $existingCa[$i] !== null ? $existingCa[$i] : '';
+                }
+
+                $row[] = $saved && $saved->exam_score !== null ? $saved->exam_score : '';
+
+                if (!empty($setting->project_enabled)) {
+                    $row[] = $saved && $saved->project_score !== null ? $saved->project_score : '';
+                }
+
+                fputcsv($file, $row);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    public function importExcel(Request $request)
+    {
+        $request->validate([
+            'excel_file' => 'required|file|max:5120',
+            'class_id' => 'required|exists:student_classes,id',
+            'subject_id' => 'required|exists:school_subjects,id',
+            'term' => ['required', Rule::in(['1st Term', '2nd Term', '3rd Term'])],
+        ]);
+
+        $file = $request->file('excel_file');
+        $path = $file->getRealPath();
+
+        $handle = fopen($path, 'r');
+        if (!$handle) {
+            return response()->json(['message' => 'Unable to open uploaded file.'], 422);
+        }
+
+        $bom = fread($handle, 3);
+        if ($bom !== "\xEF\xBB\xBF") {
+            rewind($handle);
+        }
+
+        $header = fgetcsv($handle);
+        if (!$header) {
+            fclose($handle);
+            return response()->json(['message' => 'Uploaded file is empty.'], 422);
+        }
+
+        $studentIdIdx = -1;
+        $idNoIdx = -1;
+        $caIndices = [];
+        $examIdx = -1;
+        $projectIdx = -1;
+
+        foreach ($header as $idx => $colName) {
+            $normalized = strtolower(trim(preg_replace('/[^a-zA-Z0-9_\s]/', '', $colName)));
+            if (str_contains($normalized, 'student id') || $normalized === 'id') {
+                $studentIdIdx = $idx;
+            } elseif (str_contains($normalized, 'id no') || $normalized === 'id_no') {
+                $idNoIdx = $idx;
+            } elseif (str_contains($normalized, 'ca')) {
+                $caIndices[] = $idx;
+            } elseif (str_contains($normalized, 'exam')) {
+                $examIdx = $idx;
+            } elseif (str_contains($normalized, 'project')) {
+                $projectIdx = $idx;
+            }
+        }
+
+        if ($studentIdIdx === -1 && $idNoIdx === -1) {
+            fclose($handle);
+            return response()->json(['message' => 'Invalid template format. The file must contain a "Student ID" or "ID No" column header.'], 422);
+        }
+
+        $parsedRows = [];
+        while (($row = fgetcsv($handle)) !== false) {
+            if (empty(array_filter($row, fn($v) => trim($v) !== ''))) continue;
+
+            $stId = $studentIdIdx !== -1 && isset($row[$studentIdIdx]) ? trim($row[$studentIdIdx]) : null;
+            $idNo = $idNoIdx !== -1 && isset($row[$idNoIdx]) ? trim($row[$idNoIdx]) : null;
+
+            $caScores = [];
+            foreach ($caIndices as $cIdx) {
+                $val = isset($row[$cIdx]) && trim($row[$cIdx]) !== '' ? (float) trim($row[$cIdx]) : null;
+                $caScores[] = $val;
+            }
+
+            $examScore = $examIdx !== -1 && isset($row[$examIdx]) && trim($row[$examIdx]) !== '' ? (float) trim($row[$examIdx]) : null;
+            $projectScore = $projectIdx !== -1 && isset($row[$projectIdx]) && trim($row[$projectIdx]) !== '' ? (float) trim($row[$projectIdx]) : null;
+
+            $parsedRows[] = [
+                'student_id' => $stId,
+                'id_no' => $idNo,
+                'ca' => $caScores,
+                'exam_score' => $examScore,
+                'project_score' => $projectScore
+            ];
+        }
+
+        fclose($handle);
+
+        return response()->json([
+            'message' => 'Successfully parsed ' . count($parsedRows) . ' student record(s) from Excel file.',
+            'rows' => $parsedRows
+        ]);
+    }
 }
