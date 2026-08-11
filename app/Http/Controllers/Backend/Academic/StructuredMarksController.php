@@ -694,12 +694,23 @@ class StructuredMarksController extends Controller
             return response()->json(['message' => 'Unable to open uploaded file.'], 422);
         }
 
+        $firstLine = fgets($handle);
+        rewind($handle);
+        $delimiter = ',';
+        if ($firstLine !== false) {
+            if (substr_count($firstLine, ';') > substr_count($firstLine, ',')) {
+                $delimiter = ';';
+            } elseif (substr_count($firstLine, "\t") > substr_count($firstLine, ',')) {
+                $delimiter = "\t";
+            }
+        }
+
         $bom = fread($handle, 3);
         if ($bom !== "\xEF\xBB\xBF") {
             rewind($handle);
         }
 
-        $header = fgetcsv($handle);
+        $header = fgetcsv($handle, 0, $delimiter);
         if (!$header) {
             fclose($handle);
             return response()->json(['message' => 'Uploaded file is empty.'], 422);
@@ -727,25 +738,32 @@ class StructuredMarksController extends Controller
         }
 
         if ($studentIdIdx === -1 && $idNoIdx === -1) {
-            fclose($handle);
-            return response()->json(['message' => 'Invalid template format. The file must contain a "Student ID" or "ID No" column header.'], 422);
+            $studentIdIdx = 0;
+            $idNoIdx = 1;
         }
 
         $parsedRows = [];
-        while (($row = fgetcsv($handle)) !== false) {
-            if (empty(array_filter($row, fn($v) => trim($v) !== ''))) continue;
+        while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
+            if (empty(array_filter($row, fn($v) => trim((string)$v) !== ''))) continue;
 
-            $stId = $studentIdIdx !== -1 && isset($row[$studentIdIdx]) ? trim($row[$studentIdIdx]) : null;
-            $idNo = $idNoIdx !== -1 && isset($row[$idNoIdx]) ? trim($row[$idNoIdx]) : null;
+            $stId = $studentIdIdx !== -1 && isset($row[$studentIdIdx]) ? trim((string)$row[$studentIdIdx]) : null;
+            $idNo = $idNoIdx !== -1 && isset($row[$idNoIdx]) ? trim((string)$row[$idNoIdx]) : null;
+
+            if ($stId !== null && str_ends_with($stId, '.0')) {
+                $stId = substr($stId, 0, -2);
+            }
+            if ($idNo !== null && str_ends_with($idNo, '.0')) {
+                $idNo = substr($idNo, 0, -2);
+            }
 
             $caScores = [];
             foreach ($caIndices as $cIdx) {
-                $val = isset($row[$cIdx]) && trim($row[$cIdx]) !== '' ? (float) trim($row[$cIdx]) : null;
+                $val = isset($row[$cIdx]) && trim((string)$row[$cIdx]) !== '' ? (float) trim((string)$row[$cIdx]) : null;
                 $caScores[] = $val;
             }
 
-            $examScore = $examIdx !== -1 && isset($row[$examIdx]) && trim($row[$examIdx]) !== '' ? (float) trim($row[$examIdx]) : null;
-            $projectScore = $projectIdx !== -1 && isset($row[$projectIdx]) && trim($row[$projectIdx]) !== '' ? (float) trim($row[$projectIdx]) : null;
+            $examScore = $examIdx !== -1 && isset($row[$examIdx]) && trim((string)$row[$examIdx]) !== '' ? (float) trim((string)$row[$examIdx]) : null;
+            $projectScore = $projectIdx !== -1 && isset($row[$projectIdx]) && trim((string)$row[$projectIdx]) !== '' ? (float) trim((string)$row[$projectIdx]) : null;
 
             $parsedRows[] = [
                 'student_id' => $stId,

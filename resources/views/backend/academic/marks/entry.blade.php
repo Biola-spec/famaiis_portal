@@ -261,18 +261,18 @@
         });
     });
 
-    $(document).on('click', '#load-context', function () {
+    function loadMarksContext() {
         const classId = $('#class_id').val();
         const sectionId = $('#section_id').val();
         const subjectId = $('#subject_id').val();
         const term = $('#term').val();
 
-        $.get("{{ route('academic.marks.context') }}", {
+        return $.get("{{ route('academic.marks.context') }}", {
             class_id: classId,
             section_id: sectionId,
             subject_id: subjectId,
             term: term
-        }, function (response) {
+        }).then(function (response) {
             currentSetting = response.setting;
 
             let header = '<th>ID No</th><th>Student</th><th>Gender</th>';
@@ -317,7 +317,12 @@
 
             $('#marks-body').html(body);
             $('#marks-panel').removeClass('d-none');
-        }).fail(function (xhr) {
+            return response;
+        });
+    }
+
+    $(document).on('click', '#load-context', function () {
+        loadMarksContext().fail(function (xhr) {
             const errorData = xhr.responseJSON || {};
             alert(errorData.message || 'Unable to load class marking context.');
         });
@@ -383,18 +388,36 @@
                     const rows = response.rows || [];
                     let matchCount = 0;
 
-                    $('#marks-body tr').each(function () {
+                    const normalizeId = function(val) {
+                        if (val === null || val === undefined) return '';
+                        let str = String(val).trim();
+                        if (str.endsWith('.0')) {
+                            str = str.slice(0, -2);
+                        }
+                        return str.toLowerCase();
+                    };
+
+                    const $trList = $('#marks-body tr');
+
+                    $trList.each(function (trIdx) {
                         const rowTr = $(this);
                         const stIdInput = rowTr.find('input[name*="[student_id]"]');
                         const idNoInput = rowTr.find('input[name*="[id_no]"]');
 
-                        const trStudentId = stIdInput.val();
-                        const trIdNo = idNoInput.val();
+                        const trStudentId = normalizeId(stIdInput.val());
+                        const trIdNo = normalizeId(idNoInput.val());
 
-                        const matchedData = rows.find(r => 
-                            (r.student_id && String(r.student_id) === String(trStudentId)) ||
-                            (r.id_no && String(r.id_no).toLowerCase() === String(trIdNo).toLowerCase())
-                        );
+                        let matchedData = rows.find(r => {
+                            const rStId = normalizeId(r.student_id);
+                            const rIdNo = normalizeId(r.id_no);
+
+                            return (rStId !== '' && rStId === trStudentId) ||
+                                   (rIdNo !== '' && rIdNo === trIdNo);
+                        });
+
+                        if (!matchedData && rows.length === $trList.length && rows[trIdx]) {
+                            matchedData = rows[trIdx];
+                        }
 
                         if (matchedData) {
                             matchCount++;
@@ -418,11 +441,23 @@
                         }
                     });
 
-                    const successMsg = `Successfully loaded marks for ${matchCount} student(s) from Excel file! Review the scores below and click "Save Results" to save.`;
-                    if (typeof toastr !== 'undefined') {
-                        toastr.success(successMsg);
+                    if (matchCount > 0) {
+                        const successMsg = `Successfully loaded marks for ${matchCount} student(s) from Excel file! Review the green-highlighted scores below and click "Save Results" to save.`;
+                        if (typeof toastr !== 'undefined') {
+                            toastr.success(successMsg);
+                        } else {
+                            alert(successMsg);
+                        }
+                        if ($('#marks-panel').length) {
+                            $('html, body').animate({ scrollTop: $('#marks-panel').offset().top - 80 }, 400);
+                        }
                     } else {
-                        alert(successMsg);
+                        const warnMsg = `Imported file parsed successfully (${rows.length} record(s)), but 0 students matched the loaded table. Please verify that the Student ID or ID No in your file matches the class list.`;
+                        if (typeof toastr !== 'undefined') {
+                            toastr.warning(warnMsg);
+                        } else {
+                            alert(warnMsg);
+                        }
                     }
                 },
                 error: function (xhr) {
@@ -437,9 +472,14 @@
             });
         };
 
-        if ($('#marks-panel').hasClass('d-none')) {
-            $('#load-context').trigger('click');
-            setTimeout(performImport, 600);
+        const needsLoad = $('#marks-panel').hasClass('d-none') || $('#marks-body tr').length === 0;
+        if (needsLoad) {
+            loadMarksContext().done(function () {
+                performImport();
+            }).fail(function (xhr) {
+                const errorData = xhr.responseJSON || {};
+                alert(errorData.message || 'Unable to load class context prior to import.');
+            });
         } else {
             performImport();
         }
