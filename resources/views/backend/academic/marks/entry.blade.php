@@ -388,13 +388,13 @@
                     const rows = response.rows || [];
                     let matchCount = 0;
 
-                    const normalizeId = function(val) {
+                    const normalizeStr = function(val) {
                         if (val === null || val === undefined) return '';
-                        let str = String(val).trim();
+                        let str = String(val).trim().toLowerCase();
                         if (str.endsWith('.0')) {
                             str = str.slice(0, -2);
                         }
-                        return str.toLowerCase();
+                        return str.replace(/[^a-z0-9]/g, '');
                     };
 
                     const $trList = $('#marks-body tr');
@@ -403,16 +403,22 @@
                         const rowTr = $(this);
                         const stIdInput = rowTr.find('input[name*="[student_id]"]');
                         const idNoInput = rowTr.find('input[name*="[id_no]"]');
+                        const studentNameTd = rowTr.find('td[data-label="Student"]');
 
-                        const trStudentId = normalizeId(stIdInput.val());
-                        const trIdNo = normalizeId(idNoInput.val());
+                        const trStudentId = normalizeStr(stIdInput.val());
+                        const trIdNo = normalizeStr(idNoInput.val());
+                        const trName = normalizeStr(studentNameTd.text());
 
                         let matchedData = rows.find(r => {
-                            const rStId = normalizeId(r.student_id);
-                            const rIdNo = normalizeId(r.id_no);
+                            const rStId = normalizeStr(r.student_id);
+                            const rIdNo = normalizeStr(r.id_no);
+                            const rName = normalizeStr(r.name);
 
-                            return (rStId !== '' && rStId === trStudentId) ||
-                                   (rIdNo !== '' && rIdNo === trIdNo);
+                            if (rStId !== '' && trStudentId !== '' && rStId === trStudentId) return true;
+                            if (rIdNo !== '' && trIdNo !== '' && rIdNo === trIdNo) return true;
+                            if (rName !== '' && trName !== '' && (rName === trName || trName.includes(rName) || rName.includes(trName))) return true;
+
+                            return false;
                         });
 
                         if (!matchedData && rows.length === $trList.length && rows[trIdx]) {
@@ -425,7 +431,7 @@
                             if (matchedData.ca && matchedData.ca.length > 0) {
                                 $.each(matchedData.ca, function (caIdx, scoreVal) {
                                     const caInput = rowTr.find(`input[name*="[ca][${caIdx}]"]`);
-                                    if (caInput.length && scoreVal !== null && scoreVal !== undefined) {
+                                    if (caInput.length && scoreVal !== null && scoreVal !== undefined && scoreVal !== '') {
                                         caInput.val(scoreVal).css({'border-color': '#28a745', 'background-color': '#e8f8f5'});
                                     }
                                 });

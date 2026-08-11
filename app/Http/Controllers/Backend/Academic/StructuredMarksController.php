@@ -718,22 +718,42 @@ class StructuredMarksController extends Controller
 
         $studentIdIdx = -1;
         $idNoIdx = -1;
+        $nameIdx = -1;
         $caIndices = [];
         $examIdx = -1;
         $projectIdx = -1;
+        $ignoredIndices = [];
 
         foreach ($header as $idx => $colName) {
             $normalized = strtolower(trim(preg_replace('/[^a-zA-Z0-9_\s]/', '', $colName)));
-            if (str_contains($normalized, 'student id') || $normalized === 'id') {
+            if (str_contains($normalized, 'student id') || $normalized === 'id' || $normalized === 'student_id') {
                 $studentIdIdx = $idx;
-            } elseif (str_contains($normalized, 'id no') || $normalized === 'id_no') {
+                $ignoredIndices[] = $idx;
+            } elseif (str_contains($normalized, 'id no') || $normalized === 'id_no' || str_contains($normalized, 'admission') || str_contains($normalized, 'reg')) {
                 $idNoIdx = $idx;
-            } elseif (str_contains($normalized, 'ca')) {
-                $caIndices[] = $idx;
+                $ignoredIndices[] = $idx;
+            } elseif (str_contains($normalized, 'name') || str_contains($normalized, 'student')) {
+                $nameIdx = $idx;
+                $ignoredIndices[] = $idx;
+            } elseif (str_contains($normalized, 'gender') || str_contains($normalized, 'sex')) {
+                $ignoredIndices[] = $idx;
             } elseif (str_contains($normalized, 'exam')) {
                 $examIdx = $idx;
+                $ignoredIndices[] = $idx;
             } elseif (str_contains($normalized, 'project')) {
                 $projectIdx = $idx;
+                $ignoredIndices[] = $idx;
+            } elseif (str_contains($normalized, 'ca') || str_contains($normalized, 'test') || str_contains($normalized, 'assessment') || str_contains($normalized, 'quiz') || str_contains($normalized, 'assignment') || str_contains($normalized, 'mid') || str_contains($normalized, 'score')) {
+                $caIndices[] = $idx;
+                $ignoredIndices[] = $idx;
+            }
+        }
+
+        if (empty($caIndices)) {
+            foreach ($header as $idx => $colName) {
+                if (!in_array($idx, $ignoredIndices, true)) {
+                    $caIndices[] = $idx;
+                }
             }
         }
 
@@ -742,12 +762,23 @@ class StructuredMarksController extends Controller
             $idNoIdx = 1;
         }
 
+        $parseNumeric = function($raw) {
+            if ($raw === null) return null;
+            $str = trim((string)$raw);
+            if ($str === '') return null;
+            if (preg_match('/^[-+]?[0-9]*\.?[0-9]+/', $str, $matches)) {
+                return (float)$matches[0];
+            }
+            return null;
+        };
+
         $parsedRows = [];
         while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
             if (empty(array_filter($row, fn($v) => trim((string)$v) !== ''))) continue;
 
             $stId = $studentIdIdx !== -1 && isset($row[$studentIdIdx]) ? trim((string)$row[$studentIdIdx]) : null;
             $idNo = $idNoIdx !== -1 && isset($row[$idNoIdx]) ? trim((string)$row[$idNoIdx]) : null;
+            $stName = $nameIdx !== -1 && isset($row[$nameIdx]) ? trim((string)$row[$nameIdx]) : null;
 
             if ($stId !== null && str_ends_with($stId, '.0')) {
                 $stId = substr($stId, 0, -2);
@@ -758,16 +789,17 @@ class StructuredMarksController extends Controller
 
             $caScores = [];
             foreach ($caIndices as $cIdx) {
-                $val = isset($row[$cIdx]) && trim((string)$row[$cIdx]) !== '' ? (float) trim((string)$row[$cIdx]) : null;
+                $val = isset($row[$cIdx]) ? $parseNumeric($row[$cIdx]) : null;
                 $caScores[] = $val;
             }
 
-            $examScore = $examIdx !== -1 && isset($row[$examIdx]) && trim((string)$row[$examIdx]) !== '' ? (float) trim((string)$row[$examIdx]) : null;
-            $projectScore = $projectIdx !== -1 && isset($row[$projectIdx]) && trim((string)$row[$projectIdx]) !== '' ? (float) trim((string)$row[$projectIdx]) : null;
+            $examScore = $examIdx !== -1 && isset($row[$examIdx]) ? $parseNumeric($row[$examIdx]) : null;
+            $projectScore = $projectIdx !== -1 && isset($row[$projectIdx]) ? $parseNumeric($row[$projectIdx]) : null;
 
             $parsedRows[] = [
                 'student_id' => $stId,
                 'id_no' => $idNo,
+                'name' => $stName,
                 'ca' => $caScores,
                 'exam_score' => $examScore,
                 'project_score' => $projectScore
