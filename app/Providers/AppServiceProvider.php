@@ -100,10 +100,22 @@ class AppServiceProvider extends ServiceProvider
                         }
                     }
 
+                    $unreadNotifications = collect();
+                    $unreadNotificationCount = 0;
+                    if (\Illuminate\Support\Facades\Schema::hasTable('notifications')) {
+                        try {
+                            $unreadNotifications = $user->unreadNotifications()->latest()->limit(8)->get();
+                            $unreadNotificationCount = $user->unreadNotifications()->count();
+                        } catch (\Throwable $e) {
+                            $unreadNotifications = collect();
+                            $unreadNotificationCount = 0;
+                        }
+                    }
+
                     $adminChrome = [
                         'unreadMessageCount' => $unreadMessageCount,
-                        'unreadNotifications' => $user->unreadNotifications()->latest()->limit(8)->get(),
-                        'unreadNotificationCount' => $user->unreadNotifications()->count(),
+                        'unreadNotifications' => $unreadNotifications,
+                        'unreadNotificationCount' => $unreadNotificationCount,
                         'headerSections' => $headerSections,
                     ];
                 }
