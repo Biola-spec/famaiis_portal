@@ -151,7 +151,6 @@
 
 <script>
     $(document).ready(function() {
-        // Initialize Select2
         $('.select2').select2({
             placeholder: "Select Student(s)",
             allowClear: true
@@ -159,6 +158,48 @@
 
         if (typeof CKEDITOR !== 'undefined') {
             CKEDITOR.replace('editor1');
+        }
+
+        function fetchStudentsForClass(class_id) {
+            if (!class_id) {
+                $('#student_ids').empty();
+                $('#student_ids').append('<option value="" disabled>Please select a Class first</option>');
+                $('#student_ids').trigger('change');
+                return;
+            }
+
+            $.ajax({
+                url: "{{ route('teacher.report.getStudents') }}",
+                type: "GET",
+                data: { class_id: class_id },
+                success: function(data) {
+                    $('#student_ids').empty();
+                    var count = 0;
+                    if (data && data.length > 0) {
+                        $.each(data, function(key, value) {
+                            if (value && value.id) {
+                                var label = value.name;
+                                if (value.id_no) {
+                                    label += ' (' + value.id_no + ')';
+                                }
+                                $('#student_ids').append('<option value="' + value.id + '">' + label + '</option>');
+                                count++;
+                            }
+                        });
+                    }
+                    
+                    if (count === 0) {
+                        $('#student_ids').append('<option value="" disabled>No active students found in this class</option>');
+                    }
+
+                    $('#student_ids').trigger('change');
+                },
+                error: function() {
+                    $('#student_ids').empty();
+                    $('#student_ids').append('<option value="" disabled>Error loading students</option>');
+                    $('#student_ids').trigger('change');
+                }
+            });
         }
 
         $('#class_id').on('change', function() {
@@ -172,25 +213,21 @@
                     success: function(data) {
                         $('#subject_id').empty();
                         $('#subject_id').append('<option value="" selected disabled>Select Subject</option>');
-                        $.each(data, function(key, value) {
-                            $('#subject_id').append('<option value="' + value.id + '">' + value.name + '</option>');
-                        });
+                        if (data && data.length > 0) {
+                            $.each(data, function(key, value) {
+                                if (value && value.id) {
+                                    $('#subject_id').append('<option value="' + value.id + '">' + value.name + '</option>');
+                                }
+                            });
+                        }
                     }
                 });
 
-                // Get Students for specific selection
-                $.ajax({
-                    url: "{{ route('teacher.report.getStudents') }}",
-                    type: "GET",
-                    data: { class_id: class_id },
-                    success: function(data) {
-                        $('#student_ids').empty();
-                        $.each(data, function(key, value) {
-                            $('#student_ids').append('<option value="' + value.id + '">' + value.name + ' (' + value.id_no + ')</option>');
-                        });
-                        $('#student_ids').trigger('change');
-                    }
-                });
+                // Fetch Students
+                fetchStudentsForClass(class_id);
+            } else {
+                $('#subject_id').empty().append('<option value="" selected disabled>Select Subject</option>');
+                fetchStudentsForClass(null);
             }
         });
 
@@ -198,11 +235,19 @@
             if ($(this).val() == 'specific') {
                 $('#specific_students_div').show();
                 $('#student_ids').attr('required', true);
+                var class_id = $('#class_id').val();
+                fetchStudentsForClass(class_id);
             } else {
                 $('#specific_students_div').hide();
                 $('#student_ids').attr('required', false);
             }
         });
+
+        if ($('#target').val() == 'specific') {
+            $('#specific_students_div').show();
+            var class_id = $('#class_id').val();
+            fetchStudentsForClass(class_id);
+        }
     });
 </script>
 @endsection

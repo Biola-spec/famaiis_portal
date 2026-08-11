@@ -64,7 +64,6 @@ class OrderController extends Controller
     {
         $user = auth()->user();
         $cartItems = Cart::where('user_id', $user->id)->with('product')->get();
-        $paymentSetting = PaymentSetting::first();
 
         $validated = $request->validate([
             'payment_method' => 'nullable|in:bank_transfer,student_wallet',
@@ -94,6 +93,8 @@ class OrderController extends Controller
         if ($paymentMethod === 'student_wallet') {
             return $this->storeStudentWalletOrder($validated, $cartItems, $user);
         }
+
+        $paymentSetting = PaymentSetting::first();
 
         if (!$paymentSetting || !$paymentSetting->bank_transfer_enabled || !$paymentSetting->bank_name || !$paymentSetting->account_number || !$paymentSetting->account_name) {
             return redirect()->back()->with([

@@ -92,6 +92,7 @@
         }
     }
 </style>
+
 <div class="content-wrapper">
     <div class="container-full">
         <section class="content">
@@ -169,14 +170,18 @@
                                     </div>
                                 </div>
                                 <div class="row">
-                                    <div class="col-md-3">
-                                        <div class="form-group">
-                                            <button id="load-context" type="button" class="btn btn-primary">Load Students</button>
-                                        </div>
+                                    <div class="col-md-12 d-flex align-items-center flex-wrap gap-2 mb-3">
+                                        <button id="load-context" type="button" class="btn btn-primary"><i class="fa fa-users"></i> Load Students</button>
+                                        <button id="export-excel-btn" type="button" class="btn btn-info ml-2"><i class="fa fa-file-excel-o"></i> Export / Download Excel Sample</button>
+                                        <button id="import-excel-trigger" type="button" class="btn btn-warning ml-2"><i class="fa fa-upload"></i> Import Bulk Marks (Excel / CSV)</button>
+                                        <input type="file" id="excel_file_input" accept=".csv,.txt" style="display: none;">
                                     </div>
                                 </div>
                                 <div id="marks-panel" class="row mt-3 d-none">
                                     <div class="col-md-12">
+                                        <div class="alert alert-secondary py-2 px-3 mb-3 d-flex justify-content-between align-items-center flex-wrap">
+                                            <small><i class="fa fa-info-circle text-info"></i> <strong>Excel Workflow:</strong> Click <em>Export / Download Excel Sample</em> to get a pre-filled spreadsheet, enter scores in Excel, then click <em>Import Bulk Marks</em> to populate the table automatically before saving.</small>
+                                        </div>
                                         <table class="table table-bordered table-striped marks-entry-table">
                                             <thead>
                                                 <tr id="marks-header-row">
@@ -189,7 +194,10 @@
                                             </thead>
                                             <tbody id="marks-body"></tbody>
                                         </table>
-                                        <button type="submit" class="btn btn-success">Save Results</button>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <button type="submit" class="btn btn-success btn-lg px-4"><i class="fa fa-save"></i> Save Results</button>
+                                            <button type="button" id="import-excel-trigger-bottom" class="btn btn-warning"><i class="fa fa-upload"></i> Import Marks from Excel</button>
+                                        </div>
                                     </div>
                                 </div>
                             </form>
@@ -291,7 +299,7 @@
 
                 const existingCa = existing.ca_breakdown ? existing.ca_breakdown : [];
                 for (let i = 0; i < parseInt(currentSetting.ca_count); i++) {
-                    const value = existingCa[i] !== undefined ? existingCa[i] : '';
+                    const value = existingCa[i] !== undefined && existingCa[i] !== null ? existingCa[i] : '';
                     const maxWeight = currentSetting.ca_weights && currentSetting.ca_weights[i] ? currentSetting.ca_weights[i] : '100';
                     const customLabel = customLabels[i] || `${ordinals[i] || i + 1} CA`;
                     const caLabel = labelWithMax(customLabel, maxWeight).text;
@@ -300,9 +308,9 @@
 
                 const maxExamWeight = currentSetting.exam_weight || '100';
                 const examLabel = labelWithMax(currentSetting.exam_label || 'Exam', maxExamWeight).text;
-                body += `<td data-label="${examLabel}"><input type="number" min="0" max="${escapeHtml(maxExamWeight)}" step="0.01" class="form-control form-control-sm" name="student_marks[${index}][exam_score]" value="${escapeHtml(existing.exam_score || '')}"></td>`;
+                body += `<td data-label="${examLabel}"><input type="number" min="0" max="${escapeHtml(maxExamWeight)}" step="0.01" class="form-control form-control-sm" name="student_marks[${index}][exam_score]" value="${escapeHtml(existing.exam_score !== null && existing.exam_score !== undefined ? existing.exam_score : '')}"></td>`;
                 if (currentSetting.project_enabled) {
-                    body += `<td data-label="Project"><input type="number" min="0" max="100" step="0.01" class="form-control form-control-sm" name="student_marks[${index}][project_score]" value="${escapeHtml(existing.project_score || '')}"></td>`;
+                    body += `<td data-label="Project"><input type="number" min="0" max="100" step="0.01" class="form-control form-control-sm" name="student_marks[${index}][project_score]" value="${escapeHtml(existing.project_score !== null && existing.project_score !== undefined ? existing.project_score : '')}"></td>`;
                 }
                 body += '</tr>';
             });
@@ -314,6 +322,129 @@
             alert(errorData.message || 'Unable to load class marking context.');
         });
     });
+
+    // Excel Export Handler
+    $(document).on('click', '#export-excel-btn', function () {
+        const classId = $('#class_id').val();
+        const sectionId = $('#section_id').val() || '';
+        const subjectId = $('#subject_id').val();
+        const term = $('#term').val();
+
+        if (!classId || !subjectId || !term) {
+            alert('Please select Session, Class, Term, and Subject first before exporting Excel.');
+            return;
+        }
+
+        const url = "{{ route('academic.marks.export') }}?class_id=" + classId + "&section_id=" + sectionId + "&subject_id=" + subjectId + "&term=" + encodeURIComponent(term);
+        window.location.href = url;
+    });
+
+    // Excel Import Triggers
+    $(document).on('click', '#import-excel-trigger, #import-excel-trigger-bottom', function () {
+        const classId = $('#class_id').val();
+        const subjectId = $('#subject_id').val();
+        const term = $('#term').val();
+
+        if (!classId || !subjectId || !term) {
+            alert('Please select Session, Class, Term, and Subject first before importing Excel.');
+            return;
+        }
+
+        $('#excel_file_input').val('');
+        $('#excel_file_input').click();
+    });
+
+    // Excel File Upload & Parser
+    $(document).on('change', '#excel_file_input', function () {
+        const file = this.files[0];
+        if (!file) return;
+
+        const classId = $('#class_id').val();
+        const sectionId = $('#section_id').val() || '';
+        const subjectId = $('#subject_id').val();
+        const term = $('#term').val();
+
+        const formData = new FormData();
+        formData.append('_token', '{{ csrf_token() }}');
+        formData.append('excel_file', file);
+        formData.append('class_id', classId);
+        formData.append('section_id', sectionId);
+        formData.append('subject_id', subjectId);
+        formData.append('term', term);
+
+        const performImport = function() {
+            $.ajax({
+                url: "{{ route('academic.marks.import') }}",
+                type: 'POST',
+                data: formData,
+                contentType: false,
+                processData: false,
+                success: function (response) {
+                    const rows = response.rows || [];
+                    let matchCount = 0;
+
+                    $('#marks-body tr').each(function () {
+                        const rowTr = $(this);
+                        const stIdInput = rowTr.find('input[name*="[student_id]"]');
+                        const idNoInput = rowTr.find('input[name*="[id_no]"]');
+
+                        const trStudentId = stIdInput.val();
+                        const trIdNo = idNoInput.val();
+
+                        const matchedData = rows.find(r => 
+                            (r.student_id && String(r.student_id) === String(trStudentId)) ||
+                            (r.id_no && String(r.id_no).toLowerCase() === String(trIdNo).toLowerCase())
+                        );
+
+                        if (matchedData) {
+                            matchCount++;
+
+                            if (matchedData.ca && matchedData.ca.length > 0) {
+                                $.each(matchedData.ca, function (caIdx, scoreVal) {
+                                    const caInput = rowTr.find(`input[name*="[ca][${caIdx}]"]`);
+                                    if (caInput.length && scoreVal !== null && scoreVal !== undefined) {
+                                        caInput.val(scoreVal).css({'border-color': '#28a745', 'background-color': '#e8f8f5'});
+                                    }
+                                });
+                            }
+
+                            if (matchedData.exam_score !== null && matchedData.exam_score !== undefined) {
+                                rowTr.find('input[name*="[exam_score]"]').val(matchedData.exam_score).css({'border-color': '#28a745', 'background-color': '#e8f8f5'});
+                            }
+
+                            if (matchedData.project_score !== null && matchedData.project_score !== undefined) {
+                                rowTr.find('input[name*="[project_score]"]').val(matchedData.project_score).css({'border-color': '#28a745', 'background-color': '#e8f8f5'});
+                            }
+                        }
+                    });
+
+                    const successMsg = `Successfully loaded marks for ${matchCount} student(s) from Excel file! Review the scores below and click "Save Results" to save.`;
+                    if (typeof toastr !== 'undefined') {
+                        toastr.success(successMsg);
+                    } else {
+                        alert(successMsg);
+                    }
+                },
+                error: function (xhr) {
+                    const errorData = xhr.responseJSON || {};
+                    const msg = errorData.message || 'Error processing Excel file.';
+                    if (typeof toastr !== 'undefined') {
+                        toastr.error(msg);
+                    } else {
+                        alert(msg);
+                    }
+                }
+            });
+        };
+
+        if ($('#marks-panel').hasClass('d-none')) {
+            $('#load-context').trigger('click');
+            setTimeout(performImport, 600);
+        } else {
+            performImport();
+        }
+    });
+
     $('#marks-form').on('submit', function(e) {
         e.preventDefault();
         

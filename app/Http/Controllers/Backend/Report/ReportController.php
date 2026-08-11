@@ -37,9 +37,9 @@ class ReportController extends Controller
         if ($user->hasRole('Admin') || $user->role === 'Admin') {
             $classes = StudentClass::orderBy('name')->get();
         } else {
-            $classIds = TeacherAssignment::where('teacher_id', $user->id)
-                ->pluck('class_id')
-                ->unique();
+            $assignmentClassIds = TeacherAssignment::where('teacher_id', $user->id)->pluck('class_id');
+            $classTeacherClassIds = \App\Models\AssignClassTeacher::where('teacher_id', $user->id)->pluck('class_id');
+            $classIds = $assignmentClassIds->merge($classTeacherClassIds)->unique()->filter();
             $classes = StudentClass::whereIn('id', $classIds)->orderBy('name')->get();
         }
 
@@ -57,18 +57,34 @@ class ReportController extends Controller
                 ->where('class_id', $request->class_id)
                 ->get()
                 ->pluck('subject')
-                ->filter();
+                ->filter()
+                ->values();
         }
         return response()->json($subjects);
     }
 
     public function getTeacherStudents(Request $request)
     {
-        $students = AssignStudent::with('student')
-            ->where('class_id', $request->class_id)
-            ->where('year_id', getCurrentSession()->id ?? 0)
-            ->get()
-            ->pluck('student');
+        $activeYear = getCurrentSession() ?? StudentYear::where('is_active', 1)->first() ?? StudentYear::first();
+
+        $query = AssignStudent::with('student')
+            ->whereHas('student')
+            ->where('class_id', $request->class_id);
+
+        if ($activeYear) {
+            $query->where('year_id', $activeYear->id);
+        }
+
+        $assignStudents = $query->get();
+
+        if ($assignStudents->isEmpty()) {
+            $assignStudents = AssignStudent::with('student')
+                ->whereHas('student')
+                ->where('class_id', $request->class_id)
+                ->get();
+        }
+
+        $students = $assignStudents->pluck('student')->filter()->values();
 
         return response()->json($students);
     }
@@ -106,10 +122,15 @@ class ReportController extends Controller
 
             // Link Students
             if ($report->is_for_all) {
-                $studentIds = AssignStudent::where('class_id', $request->class_id)
-                    ->where('year_id', getCurrentSession()->id ?? 0)
-                    ->pluck('student_id')
-                    ->toArray();
+                $activeYear = getCurrentSession() ?? StudentYear::where('is_active', 1)->first() ?? StudentYear::first();
+                $query = AssignStudent::whereHas('student')->where('class_id', $request->class_id);
+                if ($activeYear) {
+                    $query->where('year_id', $activeYear->id);
+                }
+                $studentIds = $query->pluck('student_id')->toArray();
+                if (empty($studentIds)) {
+                    $studentIds = AssignStudent::whereHas('student')->where('class_id', $request->class_id)->pluck('student_id')->toArray();
+                }
                 $report->students()->attach($studentIds);
             } else {
                 $report->students()->attach($request->student_ids);

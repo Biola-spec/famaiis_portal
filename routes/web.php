@@ -561,6 +561,8 @@ Route::middleware(['auth', 'permission:view_results|view-results|upload_results|
     Route::get('marks/subjects', [StructuredMarksController::class, 'getAssignedSubjects'])->name('academic.marks.subjects');
     Route::get('marks/context', [StructuredMarksController::class, 'loadEntryContext'])->name('academic.marks.context');
     Route::post('marks/store', [StructuredMarksController::class, 'store'])->name('academic.marks.store');
+    Route::get('marks/export-excel', [StructuredMarksController::class, 'exportExcel'])->name('academic.marks.export');
+    Route::post('marks/import-excel', [StructuredMarksController::class, 'importExcel'])->name('academic.marks.import');
 
     Route::get('results', [StructuredMarksController::class, 'results'])->name('academic.results.index');
 
