@@ -159,7 +159,7 @@
                         </div>
                     </div>
                 </div>
-                @include('admin.body.events_widget')
+                @include('admin.body.school_schedule_widget')
             </div>
         </section>
     </div>

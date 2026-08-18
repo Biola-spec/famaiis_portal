@@ -78,9 +78,9 @@ class LeaveRequestController extends Controller
             'admin_comment' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        if ($validated['status'] === 'rejected' && empty($validated['admin_comment'])) {
+        if (empty($validated['admin_comment'])) {
             return back()->with([
-                'message' => 'Please add a rejection comment.',
+                'message' => 'Please add a comment for this leave decision.',
                 'alert-type' => 'error',
             ]);
         }

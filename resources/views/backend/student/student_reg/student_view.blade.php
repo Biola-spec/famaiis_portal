@@ -93,8 +93,12 @@
 					@endif
 					
 					@if(isset($year_id) && isset($class_id))
-						<a href="{{ route('student.registration.export', ['year_id' => $year_id, 'class_id' => $class_id]) }}" class="btn btn-rounded btn-info mb-5"> Export CSV </a>
+						<a href="{{ route('student.registration.export', ['year_id' => $year_id, 'class_id' => $class_id]) }}" class="btn btn-rounded btn-info mb-5"> Export XLSX </a>
 					@endif
+					@if(!isset($year_id) || !isset($class_id))
+						<a href="{{ route('student.registration.export') }}" class="btn btn-rounded btn-info mb-5"> Export All XLSX </a>
+					@endif
+					<a href="{{ route('student.registration.import-template') }}" class="btn btn-rounded btn-secondary mb-5"> Import Template </a>
 
 					@if(Auth::user()->hasPermission('create_student'))
 					<button type="button" class="btn btn-rounded btn-warning mb-5" data-toggle="modal" data-target="#modal-import">
@@ -106,6 +110,16 @@
 				</div>
 				<!-- /.box-header -->
 				<div class="box-body">
+					@if(session('import_errors'))
+						<div class="alert alert-warning">
+							<strong>Import row issues</strong>
+							<ul class="mb-0 mt-2">
+								@foreach(session('import_errors') as $importError)
+									<li>{{ $importError }}</li>
+								@endforeach
+							</ul>
+						</div>
+					@endif
 					<div class="table-responsive">
 
 	 <table class="table table-bordered table-striped">
@@ -290,9 +304,9 @@ $(function () {
 			<div class="form-group">
 				<h5>Select CSV File <span class="text-danger">*</span></h5>
 				<div class="controls">
-					<input type="file" name="import_file" class="form-control" required="">
+					<input type="file" name="import_file" class="form-control" accept=".csv,.txt,.xlsx,.xls" required="">
 				</div>
-				<small class="text-muted">Format: ID No, Name, First Name, Surname, Middle Name, Email, Mobile, Gender, Address (Include Header Row)</small>
+				<small class="text-muted">Use the exported CSV format: admission_no, first_name, last_name, middle_name, date_of_birth, gender, email, guardian_phone, address.</small>
 			</div>
 		</div>
 		<div class="modal-footer modal-footer-uniform">

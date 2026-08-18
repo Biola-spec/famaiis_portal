@@ -2,13 +2,36 @@
 @section('admin')
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 <style>
-    .marks-entry-table th,
+    .table-responsive-marks {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        margin-bottom: 1.5rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+    }
+
+    .marks-entry-table {
+        margin-bottom: 0;
+        width: 100%;
+    }
+
+    .marks-entry-table th {
+        vertical-align: middle;
+        white-space: nowrap;
+        background-color: #f8fafc;
+        color: #1e293b;
+        font-weight: 600;
+    }
+
     .marks-entry-table td {
         vertical-align: middle;
+        white-space: nowrap;
     }
 
     .marks-entry-table input[type="number"] {
-        min-width: 82px;
+        min-width: 75px;
+        max-width: 110px;
     }
 
     @media (max-width: 767.98px) {
@@ -174,7 +197,7 @@
                                         <button id="load-context" type="button" class="btn btn-primary"><i class="fa fa-users"></i> Load Students</button>
                                         <button id="export-excel-btn" type="button" class="btn btn-info ml-2"><i class="fa fa-file-excel-o"></i> Export / Download Excel Sample</button>
                                         <button id="import-excel-trigger" type="button" class="btn btn-warning ml-2"><i class="fa fa-upload"></i> Import Bulk Marks (Excel / CSV)</button>
-                                        <input type="file" id="excel_file_input" accept=".csv,.txt" style="display: none;">
+                                        <input type="file" id="excel_file_input" accept=".csv,.txt,.xlsx,.xls" style="display: none;">
                                     </div>
                                 </div>
                                 <div id="marks-panel" class="row mt-3 d-none">
@@ -182,18 +205,20 @@
                                         <div class="alert alert-secondary py-2 px-3 mb-3 d-flex justify-content-between align-items-center flex-wrap">
                                             <small><i class="fa fa-info-circle text-info"></i> <strong>Excel Workflow:</strong> Click <em>Export / Download Excel Sample</em> to get a pre-filled spreadsheet, enter scores in Excel, then click <em>Import Bulk Marks</em> to populate the table automatically before saving.</small>
                                         </div>
-                                        <table class="table table-bordered table-striped marks-entry-table">
-                                            <thead>
-                                                <tr id="marks-header-row">
-                                                    <th>ID No</th>
-                                                    <th>Student</th>
-                                                    <th>Gender</th>
-                                                    <th>Exam</th>
-                                                    <th>Project</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="marks-body"></tbody>
-                                        </table>
+                                        <div class="table-responsive-marks">
+                                            <table class="table table-bordered table-striped marks-entry-table">
+                                                <thead>
+                                                    <tr id="marks-header-row">
+                                                        <th>ID No</th>
+                                                        <th>Student</th>
+                                                        <th>Gender</th>
+                                                        <th>Exam</th>
+                                                        <th>Project</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="marks-body"></tbody>
+                                            </table>
+                                        </div>
                                         <div class="d-flex justify-content-between align-items-center">
                                             <button type="submit" class="btn btn-success btn-lg px-4"><i class="fa fa-save"></i> Save Results</button>
                                             <button type="button" id="import-excel-trigger-bottom" class="btn btn-warning"><i class="fa fa-upload"></i> Import Marks from Excel</button>

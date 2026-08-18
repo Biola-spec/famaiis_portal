@@ -4,8 +4,8 @@
  $user = Auth::user();
  
  // Robust case-insensitive role detection
- $is_admin = $user->hasRole('Admin', 'Super Admin');
- $is_teacher = $user->hasRole('Teacher', 'Staff');
+ $is_admin = $user->hasRole('Admin') || $user->hasRole('Super Admin');
+ $is_teacher = $user->hasRole('Teacher') || $user->hasRole('Staff');
  $is_parent = $user->hasRole('Parent');
  $is_student = $user->hasRole('Student');
  $is_accountant = $user->hasRole('Accountant');
@@ -337,6 +337,12 @@
         </li>
 @endif
 
+@if($is_admin)
+        <li class="{{ str_starts_with($route ?? '', 'timetable.') ? 'active' : '' }}">
+          <a href="{{ route('timetable.index') }}"><i data-feather="clock"></i> <span>Subject Timetable</span></a>
+        </li>
+@endif
+
 
 @if($is_admin || $is_accountant || $user->hasPermission('manage-shop'))
         <li class="header nav-small-cap">School Shop</li>
@@ -414,6 +420,14 @@
         </li>
 @endif
 
+
+@if($is_teacher || $is_admin)
+<li class="{{ str_starts_with($route ?? '', 'ai.') ? 'active' : '' }}">
+  <a href="{{ route('ai.tools') }}">
+    <i data-feather="cpu"></i> <span>Writing Assistant</span>
+  </a>
+</li>
+@endif
 
     </ul>
     

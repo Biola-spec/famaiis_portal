@@ -7,6 +7,8 @@ use App\Models\SiteSetting;
 use View;
 use Illuminate\Support\Facades\Route;
 use Livewire\Livewire;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Support\Facades\RateLimiter;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -27,6 +29,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot()
     {
+        RateLimiter::for('gemini', function () {
+            return Limit::perMinute(8)->by('gemini-api');
+        });
+
         $basePath = trim((string) parse_url((string) config('app.url'), PHP_URL_PATH), '/');
         $prefix = $basePath ? '/' . $basePath : '';
 

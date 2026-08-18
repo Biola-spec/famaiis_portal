@@ -34,6 +34,19 @@ class StudentAttendanceController extends Controller
         }
 
         $data['allData'] = $query->get();
+
+        $summaryQuery = StudentAttendance::query();
+        if (!$teacher->hasRole('Admin')) {
+            $summaryQuery->whereIn('class_id', $classIds ?? []);
+        }
+
+        $data['attendanceSummary'] = [
+            'days' => (clone $summaryQuery)->distinct('date')->count('date'),
+            'present' => (clone $summaryQuery)->whereRaw('LOWER(attend_status) = ?', ['present'])->count(),
+            'absent' => (clone $summaryQuery)->whereRaw('LOWER(attend_status) = ?', ['absent'])->count(),
+            'leave' => (clone $summaryQuery)->whereRaw('LOWER(attend_status) = ?', ['leave'])->count(),
+        ];
+
         return view('backend.student.attendance.attendance_view', $data);
     }
 
@@ -71,21 +84,34 @@ class StudentAttendanceController extends Controller
 
     public function AttendanceStore(Request $request)
     {
-        StudentAttendance::where('date', date('Y-m-d', strtotime($request->date)))
-            ->where('class_id', $request->class_id)
-            ->where('section_id', $request->section_id)
+        $validated = $request->validate([
+            'date' => ['required', 'date'],
+            'year_id' => ['required', 'integer', 'exists:student_years,id'],
+            'class_id' => ['required', 'integer', 'exists:student_classes,id'],
+            'section_id' => ['nullable', 'integer', 'exists:school_sections,id'],
+            'student_id' => ['required', 'array', 'min:1'],
+            'student_id.*' => ['required', 'integer', 'exists:users,id'],
+        ]);
+
+        $date = date('Y-m-d', strtotime($validated['date']));
+        $sectionId = $validated['section_id'] ?? null;
+
+        StudentAttendance::whereDate('date', $date)
+            ->where('class_id', $validated['class_id'])
+            ->when($sectionId === null, fn ($query) => $query->whereNull('section_id'))
+            ->when($sectionId !== null, fn ($query) => $query->where('section_id', $sectionId))
             ->delete();
 
-        $countstudent = count($request->student_id);
+        $countstudent = count($validated['student_id']);
         for ($i = 0; $i < $countstudent; $i++) {
             $attend_status = 'attend_status' . $i;
             $attend = new StudentAttendance();
-            $attend->date = date('Y-m-d', strtotime($request->date));
-            $attend->student_id = $request->student_id[$i];
-            $attend->year_id = $request->year_id;
-            $attend->class_id = $request->class_id;
-            $attend->section_id = $request->section_id;
-            $attend->attend_status = $request->$attend_status;
+            $attend->date = $date;
+            $attend->student_id = $validated['student_id'][$i];
+            $attend->year_id = $validated['year_id'];
+            $attend->class_id = $validated['class_id'];
+            $attend->section_id = $sectionId;
+            $attend->attend_status = $request->input($attend_status, 'Present');
             $attend->save();
         }
 

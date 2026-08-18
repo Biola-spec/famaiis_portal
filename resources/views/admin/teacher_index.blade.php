@@ -76,7 +76,7 @@
             </div>
 
             <div class="row">
-                @include('admin.body.events_widget')
+                @include('admin.body.school_schedule_widget')
             </div>
 
             <div class="row">

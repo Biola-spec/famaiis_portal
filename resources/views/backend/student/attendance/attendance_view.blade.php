@@ -13,6 +13,12 @@
                         </div>
                         <!-- /.box-header -->
                         <div class="box-body">
+                            <div class="row mb-3">
+                                <div class="col-md-3 col-6"><strong>Days Recorded:</strong> {{ $attendanceSummary['days'] ?? 0 }}</div>
+                                <div class="col-md-3 col-6 text-success"><strong>Present:</strong> {{ $attendanceSummary['present'] ?? 0 }}</div>
+                                <div class="col-md-3 col-6 text-danger"><strong>Absent:</strong> {{ $attendanceSummary['absent'] ?? 0 }}</div>
+                                <div class="col-md-3 col-6 text-info"><strong>Leave:</strong> {{ $attendanceSummary['leave'] ?? 0 }}</div>
+                            </div>
                             <div class="table-responsive">
                                 <table id="example1" class="table table-bordered table-striped">
                                     <thead>

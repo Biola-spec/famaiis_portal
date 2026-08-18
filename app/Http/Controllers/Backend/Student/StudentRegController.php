@@ -15,6 +15,10 @@ use App\Models\SchoolSection;
 use DB;
 use PDF;
 use Illuminate\Support\Facades\Auth;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Imports\StudentsImport;
+use App\Exports\StudentsExport;
+use App\Exports\StudentImportTemplateExport;
 
 class StudentRegController extends Controller
 {
@@ -428,95 +432,175 @@ class StudentRegController extends Controller
 
     public function StudentExport(Request $request) {
         if (Auth::user()->hasRole('Parent')) abort(403);
-        $students = AssignStudent::with(['student'])
-            ->where('year_id', $request->year_id)
-            ->where('class_id', $request->class_id)
-            ->get();
 
-        $filename = "students_export_" . date('Y-m-d') . ".csv";
-        $headers  = [
-            "Content-type"        => "text/csv",
-            "Content-Disposition" => "attachment; filename=$filename",
-            "Pragma"              => "no-cache",
-            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
-            "Expires"             => "0",
-        ];
+        $request->validate([
+            'year_id' => ['nullable', 'integer', 'exists:student_years,id'],
+            'class_id' => ['nullable', 'integer', 'exists:student_classes,id'],
+        ]);
 
-        $callback = function() use($students) {
-            $file = fopen('php://output', 'w');
-            fputcsv($file, ['ID No', 'Name', 'First Name', 'Surname', 'Middle Name', 'Email', 'Mobile', 'Gender', 'Address']);
-            foreach ($students as $row) {
-                $s = $row->student;
-                fputcsv($file, [$s->id_no, $s->name, $s->first_name, $s->surname, $s->middle_name, $s->email, $s->mobile, $s->gender, $s->address]);
-            }
-            fclose($file);
-        };
+        return Excel::download(
+            new StudentsExport($request->integer('year_id') ?: null, $request->integer('class_id') ?: null),
+            'students-export-' . now()->format('Y-m-d') . '.xlsx'
+        );
 
-        return response()->stream($callback, 200, $headers);
+    }
+
+    public function StudentImportTemplate()
+    {
+        if (Auth::user()->hasRole('Parent')) abort(403);
+
+        return Excel::download(new StudentImportTemplateExport(), 'student-import-template.xlsx');
     }
 
     public function StudentImport(Request $request) {
         if (Auth::user()->hasRole('Parent')) abort(403);
-        $file = $request->file('import_file');
-        if (!$file) {
-            return redirect()->back()->with(['message' => 'Please upload a CSV file', 'alert-type' => 'error']);
+
+        $request->validate([
+            'year_id' => ['required', 'integer', 'exists:student_years,id'],
+            'class_id' => ['required', 'integer', 'exists:student_classes,id'],
+            'section_id' => ['required', 'integer', 'exists:school_sections,id'],
+            'group_id' => ['nullable', 'integer', 'exists:student_groups,id'],
+            'import_file' => ['required', 'file', 'mimes:csv,txt,xlsx,xls', 'max:10240'],
+        ]);
+
+        if (in_array(strtolower($request->file('import_file')->getClientOriginalExtension()), ['xlsx', 'xls'])) {
+            $import = new StudentsImport($request->integer('year_id'), $request->integer('class_id'), $request->integer('section_id'), $request->integer('group_id') ?: null);
+            Excel::import($import, $request->file('import_file'));
+            $errors = $import->errors();
+            $failures = $import->failures();
+            return redirect()->back()->with([
+                'message' => 'Students imported successfully.' . ($errors->isNotEmpty() || $failures->isNotEmpty() ? ' Some rows were skipped.' : ''),
+                'alert-type' => 'success',
+                'import_errors' => $errors->map(fn ($error) => 'Import error: ' . $error->getMessage())->merge(
+                    $failures->map(fn ($failure) => 'Row ' . $failure->row() . ': ' . implode(', ', $failure->errors()))
+                )->all(),
+            ]);
         }
 
+        $file = $request->file('import_file');
         $handle = fopen($file->getRealPath(), 'r');
-        fgetcsv($handle); // Skip header
+        $headers = fgetcsv($handle);
+        $headers = array_map(function ($header) {
+            $header = strtolower(trim((string) $header));
+            $header = ltrim($header, "\xEF\xBB\xBF");
+            return preg_replace('/[^a-z0-9]+/', '_', $header);
+        }, $headers ?: []);
 
-        DB::transaction(function() use($handle, $request) {
-            while (($data = fgetcsv($handle)) !== FALSE) {
-                if (count($data) < 2) continue;
-                $code = rand(1000, 9999);
+        $required = ['admission_no', 'first_name'];
+        $legacyHeaders = ['id_no', 'name'];
+        $hasNamedHeaders = count(array_intersect($required, $headers)) === count($required);
+        $hasLegacyHeaders = count(array_intersect($legacyHeaders, $headers)) === count($legacyHeaders);
+
+        if (!$hasNamedHeaders && !$hasLegacyHeaders) {
+            fclose($handle);
+            return redirect()->back()->with([
+                'message' => 'Invalid CSV header. Use the exported format or include admission_no, first_name, and last_name.',
+                'alert-type' => 'error',
+            ]);
+        }
+
+        $headerIndex = array_flip($headers);
+        $errors = [];
+        $seenAdmissionNumbers = [];
+        $imported = 0;
+        $rowNumber = 1;
+
+        while (($data = fgetcsv($handle)) !== false) {
+            $rowNumber++;
+            if (count(array_filter($data, fn ($value) => trim((string) $value) !== '')) === 0) {
+                continue;
+            }
+
+            $row = [];
+            foreach ($headerIndex as $header => $index) {
+                $row[$header] = trim((string) ($data[$index] ?? ''));
+            }
+
+            $admissionNo = $row['admission_no'] ?? $row['id_no'] ?? '';
+            $firstName = $row['first_name'] ?? '';
+            $lastName = $row['last_name'] ?? ($row['surname'] ?? '');
+            $fullName = $row['name'] ?? trim($firstName . ' ' . $lastName . ' ' . ($row['middle_name'] ?? ''));
+
+            if ($admissionNo === '' || $firstName === '' || $lastName === '') {
+                $errors[] = "Row {$rowNumber}: admission number, first name, and last name are required.";
+                continue;
+            }
+
+            $normalizedAdmissionNo = strtolower($admissionNo);
+            if (isset($seenAdmissionNumbers[$normalizedAdmissionNo])) {
+                $errors[] = "Row {$rowNumber}: duplicate admission number '{$admissionNo}' in this file.";
+                continue;
+            }
+            $seenAdmissionNumbers[$normalizedAdmissionNo] = true;
+
+            if (User::where('id_no', $admissionNo)->exists()) {
+                $errors[] = "Row {$rowNumber}: admission number '{$admissionNo}' already exists.";
+                continue;
+            }
+
+            if (!empty($row['email']) && !filter_var($row['email'], FILTER_VALIDATE_EMAIL)) {
+                $errors[] = "Row {$rowNumber}: invalid email address.";
+                continue;
+            }
+
+            DB::transaction(function () use ($row, $admissionNo, $firstName, $lastName, $fullName, $request, &$imported) {
+                $code = (string) random_int(1000, 9999);
                 $user = new User();
-                $user->id_no      = $data[0];
-                $user->name       = $data[1];
-                $user->first_name = $data[2] ?? null;
-                $user->surname    = $data[3] ?? null;
-                $user->middle_name= $data[4] ?? null;
-                $user->email      = $data[5] ?? null;
-                $user->mobile     = $data[6] ?? null;
-                $user->gender     = $data[7] ?? null;
-                $user->address    = $data[8] ?? null;
-                $user->password   = bcrypt($code);
-                $user->usertype   = 'student';
-                $user->code       = $code;
-                $user->status     = 1;
+                $user->id_no = $admissionNo;
+                $user->name = $fullName;
+                $user->first_name = $firstName;
+                $user->surname = $lastName;
+                $user->middle_name = $row['middle_name'] ?? null;
+                $user->email = $row['email'] ?? null;
+                $user->mobile = $row['guardian_phone'] ?? ($row['mobile'] ?? null);
+                $user->gender = $row['gender'] ?? null;
+                $user->address = $row['address'] ?? null;
+                $user->dob = !empty($row['date_of_birth']) ? date('Y-m-d', strtotime($row['date_of_birth'])) : null;
+                $user->password = bcrypt($code);
+                $user->usertype = 'student';
+                $user->code = $code;
+                $user->status = 1;
                 $user->section_id = $request->section_id;
                 $user->save();
 
                 $assign = new AssignStudent();
                 $assign->student_id = $user->id;
-                $assign->year_id    = $request->year_id;
-                $assign->class_id   = $request->class_id;
-                $assign->group_id   = $request->group_id;
+                $assign->year_id = $request->year_id;
+                $assign->class_id = $request->class_id;
+                $assign->group_id = $request->group_id;
                 $assign->save();
 
-                // Enroll in pivot
-                if ($request->section_id) {
-                    DB::table('student_section')->insert([
-                        'student_id'      => $user->id,
-                        'section_id'      => $request->section_id,
-                        'class_id'        => $request->class_id,
-                        'year_id'         => $request->year_id,
-                        'is_active'       => true,
-                        'enrollment_date' => now()->toDateString(),
-                        'created_at'      => now(),
-                        'updated_at'      => now(),
-                    ]);
-                }
+                DB::table('student_section')->insert([
+                    'student_id' => $user->id,
+                    'section_id' => $request->section_id,
+                    'class_id' => $request->class_id,
+                    'year_id' => $request->year_id,
+                    'is_active' => true,
+                    'enrollment_date' => now()->toDateString(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
 
                 $discount = new DiscountStudent();
                 $discount->assign_student_id = $assign->id;
-                $discount->fee_category_id   = '1';
-                $discount->discount          = 0;
+                $discount->fee_category_id = '1';
+                $discount->discount = 0;
                 $discount->save();
-            }
-        });
-
+                $imported++;
+            });
+        }
         fclose($handle);
-        return redirect()->back()->with(['message' => 'Students Imported Successfully', 'alert-type' => 'success']);
+
+        $message = "{$imported} student(s) imported successfully.";
+        if ($errors) {
+            $message .= ' ' . count($errors) . ' row(s) skipped.';
+        }
+
+        return redirect()->back()->with([
+            'message' => $message,
+            'alert-type' => $imported > 0 ? 'success' : 'error',
+            'import_errors' => $errors,
+        ]);
     }
 
     public function GroupPromotionView(){

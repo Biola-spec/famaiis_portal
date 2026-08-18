@@ -15,6 +15,9 @@ class StudentAssessment extends Model
         'teacher_comment',
         'head_teacher_comment',
         'cognitive_areas',
+        'ai_comment_draft',
+        'ai_status',
+        'ai_flag',
     ];
 
     protected $casts = [
@@ -24,5 +27,10 @@ class StudentAssessment extends Model
     public function student()
     {
         return $this->belongsTo(User::class, 'student_id');
+    }
+
+    public function student_class()
+    {
+        return $this->belongsTo(StudentClass::class, 'class_id');
     }
 }

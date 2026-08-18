@@ -21,6 +21,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rule;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Imports\MarksRowsImport;
 
 class StructuredMarksController extends Controller
 {
@@ -680,14 +682,53 @@ class StructuredMarksController extends Controller
     public function importExcel(Request $request)
     {
         $request->validate([
-            'excel_file' => 'required|file|max:5120',
+            'excel_file' => 'required|file|mimes:csv,txt,xlsx,xls|max:5120',
             'class_id' => 'required|exists:student_classes,id',
             'subject_id' => 'required|exists:school_subjects,id',
             'term' => ['required', Rule::in(['1st Term', '2nd Term', '3rd Term'])],
         ]);
 
+        $session = getCurrentSession();
+
+        $setting = ClassMarkingSetting::query()
+            ->where('class_id', $request->class_id)
+            ->where(function ($query) use ($request) {
+                $query->whereNull('section_id')->orWhere('section_id', $request->section_id);
+            })
+            ->where(function ($query) use ($request) {
+                $query->whereNull('subject_id')->orWhere('subject_id', $request->subject_id);
+            })
+            ->where(function ($query) use ($session) {
+                $query->whereNull('session_id')->orWhere('session_id', optional($session)->id);
+            })
+            ->where(function ($query) use ($request) {
+                $query->whereNull('term')->orWhere('term', $request->term);
+            })
+            ->where('is_active', true)
+            ->orderByDesc('term')
+            ->orderByDesc('subject_id')
+            ->orderByDesc('section_id')
+            ->orderByDesc('session_id')
+            ->first();
+
         $file = $request->file('excel_file');
         $path = $file->getRealPath();
+
+        $temporaryConvertedPath = null;
+        if (in_array(strtolower($file->getClientOriginalExtension()), ['xlsx', 'xls'])) {
+            $rows = Excel::toArray(new MarksRowsImport(), $file)[0] ?? [];
+            if (empty($rows)) {
+                return response()->json(['message' => 'Uploaded spreadsheet is empty.'], 422);
+            }
+
+            $temporaryConvertedPath = tempnam(sys_get_temp_dir(), 'marks-import-');
+            $temporaryHandle = fopen($temporaryConvertedPath, 'w');
+            foreach ($rows as $row) {
+                fputcsv($temporaryHandle, $row);
+            }
+            fclose($temporaryHandle);
+            $path = $temporaryConvertedPath;
+        }
 
         $handle = fopen($path, 'r');
         if (!$handle) {
@@ -719,43 +760,87 @@ class StructuredMarksController extends Controller
         $studentIdIdx = -1;
         $idNoIdx = -1;
         $nameIdx = -1;
-        $caIndices = [];
+        $genderIdx = -1;
+
+        $customLabels = $setting ? ($setting->ca_labels ?? []) : [];
+        $caCount = $setting ? (int)($setting->ca_count ?? 0) : 0;
+        $projectEnabled = $setting ? !empty($setting->project_enabled) : false;
+
+        $caIndices = array_fill(0, max($caCount, 1), -1);
         $examIdx = -1;
         $projectIdx = -1;
-        $ignoredIndices = [];
+
+        $unassignedScoreCols = [];
 
         foreach ($header as $idx => $colName) {
-            $normalized = strtolower(trim(preg_replace('/[^a-zA-Z0-9_\s]/', '', $colName)));
+            $raw = trim($colName);
+            $normalized = strtolower(trim(preg_replace('/[^a-zA-Z0-9_\s]/', '', $raw)));
+
             if (str_contains($normalized, 'student id') || $normalized === 'id' || $normalized === 'student_id') {
                 $studentIdIdx = $idx;
-                $ignoredIndices[] = $idx;
-            } elseif (str_contains($normalized, 'id no') || $normalized === 'id_no' || str_contains($normalized, 'admission') || str_contains($normalized, 'reg')) {
-                $idNoIdx = $idx;
-                $ignoredIndices[] = $idx;
-            } elseif (str_contains($normalized, 'name') || str_contains($normalized, 'student')) {
-                $nameIdx = $idx;
-                $ignoredIndices[] = $idx;
-            } elseif (str_contains($normalized, 'gender') || str_contains($normalized, 'sex')) {
-                $ignoredIndices[] = $idx;
-            } elseif (str_contains($normalized, 'exam')) {
-                $examIdx = $idx;
-                $ignoredIndices[] = $idx;
-            } elseif (str_contains($normalized, 'project')) {
-                $projectIdx = $idx;
-                $ignoredIndices[] = $idx;
-            } elseif (str_contains($normalized, 'ca') || str_contains($normalized, 'test') || str_contains($normalized, 'assessment') || str_contains($normalized, 'quiz') || str_contains($normalized, 'assignment') || str_contains($normalized, 'mid') || str_contains($normalized, 'score')) {
-                $caIndices[] = $idx;
-                $ignoredIndices[] = $idx;
+                continue;
             }
-        }
+            if (str_contains($normalized, 'id no') || $normalized === 'id_no' || str_contains($normalized, 'admission') || str_contains($normalized, 'reg')) {
+                $idNoIdx = $idx;
+                continue;
+            }
+            if (str_contains($normalized, 'name') || str_contains($normalized, 'student')) {
+                $nameIdx = $idx;
+                continue;
+            }
+            if (str_contains($normalized, 'gender') || str_contains($normalized, 'sex')) {
+                $genderIdx = $idx;
+                continue;
+            }
 
-        if (empty($caIndices)) {
-            foreach ($header as $idx => $colName) {
-                if (!in_array($idx, $ignoredIndices, true)) {
-                    $caIndices[] = $idx;
+            $matchedCa = false;
+            if ($caCount > 0) {
+                for ($c = 0; $c < $caCount; $c++) {
+                    $lbl = strtolower(trim(preg_replace('/[^a-zA-Z0-9_\s]/', '', $customLabels[$c] ?? '')));
+                    if ($lbl !== '' && (str_contains($normalized, $lbl) || str_contains($lbl, $normalized))) {
+                        $caIndices[$c] = $idx;
+                        $matchedCa = true;
+                        break;
+                    }
                 }
             }
+
+            if ($matchedCa) continue;
+
+            if ($examIdx === -1 && str_contains($normalized, 'exam')) {
+                $examIdx = $idx;
+                continue;
+            }
+
+            if ($projectEnabled && $projectIdx === -1 && str_contains($normalized, 'project')) {
+                $projectIdx = $idx;
+                continue;
+            }
+
+            $unassignedScoreCols[] = $idx;
         }
+
+        if ($caCount > 0) {
+            for ($c = 0; $c < $caCount; $c++) {
+                if ($caIndices[$c] === -1 && !empty($unassignedScoreCols)) {
+                    $caIndices[$c] = array_shift($unassignedScoreCols);
+                }
+            }
+        } else {
+            $caIndices = $unassignedScoreCols;
+            $unassignedScoreCols = [];
+        }
+
+        if ($examIdx === -1 && !empty($unassignedScoreCols)) {
+            $examIdx = array_shift($unassignedScoreCols);
+        }
+
+        if ($projectEnabled && $projectIdx === -1 && !empty($unassignedScoreCols)) {
+            $projectIdx = array_shift($unassignedScoreCols);
+        }
+
+        $caIndices = array_filter($caIndices, fn($i) => $i !== -1);
+        $caIndices = array_values($caIndices);
 
         if ($studentIdIdx === -1 && $idNoIdx === -1) {
             $studentIdIdx = 0;
@@ -807,6 +892,9 @@ class StructuredMarksController extends Controller
         }
 
         fclose($handle);
+        if ($temporaryConvertedPath) {
+            @unlink($temporaryConvertedPath);
+        }
 
         return response()->json([
             'message' => 'Successfully parsed ' . count($parsedRows) . ' student record(s) from Excel file.',

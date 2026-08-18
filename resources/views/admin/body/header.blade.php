@@ -145,11 +145,21 @@
 				<!-- inner menu: contains the actual data -->
 				<ul class="menu sm-scrol">
                   @forelse(($unreadNotifications ?? collect()) as $notification)
+				  @php
+					  $notificationData = is_array($notification->data ?? null) ? $notification->data : [];
+					  $notificationType = $notificationData['type'] ?? null;
+					  $notificationTitle = $notificationData['title'] ?? $notificationData['message'] ?? __('ui.notifications');
+					  $notificationHref = $notificationType === 'report' ? route('parent.report.index') : '#';
+					  $notificationIcon = $notificationType === 'report'
+						  ? 'fa-book text-info'
+						  : (array_key_exists('leave_request_id', $notificationData) ? 'fa-calendar-check-o text-success' : 'fa-bell text-warning');
+					  $notificationTime = $notificationData['timestamp'] ?? $notification->created_at ?? now();
+				  @endphp
 				  <li>
-					<a href="{{ $notification->data['type'] == 'report' ? route('parent.report.index') : '#' }}">
-					  <i class="fa {{ $notification->data['type'] == 'report' ? 'fa-book text-info' : 'fa-bell text-warning' }}"></i> 
-                      {{ $notification->data['title'] }}
-                      <small class="pull-right">{{ \Carbon\Carbon::parse($notification->data['timestamp'] ?? now())->diffForHumans() }}</small>
+					<a href="{{ $notificationHref }}">
+					  <i class="fa {{ $notificationIcon }}"></i>
+                      {{ $notificationTitle }}
+                      <small class="pull-right">{{ \Carbon\Carbon::parse($notificationTime)->diffForHumans() }}</small>
 					</a>
 				  </li>
                   @empty

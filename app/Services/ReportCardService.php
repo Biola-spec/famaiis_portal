@@ -7,8 +7,11 @@ use App\Models\AcademicSetting;
 use App\Models\ClassMarkingSetting;
 use App\Models\MarksGrade;
 use App\Models\SiteSetting;
+use App\Models\SchoolSetting;
 use App\Models\StudentAssessment;
 use App\Models\StudentMarks;
+use App\Models\StudentAttendance;
+use Illuminate\Support\Facades\Schema;
 
 class ReportCardService
 {
@@ -70,6 +73,35 @@ class ReportCardService
         $assessment = $assessmentQuery->first();
         $allGrades = MarksGrade::all();
 
+        $attendance = [
+            'opened' => 0,
+            'present' => 0,
+            'absent' => 0,
+            'leave' => 0,
+            'percentage' => 0,
+        ];
+
+        if (Schema::hasTable('student_attendances')) {
+            $attendanceQuery = StudentAttendance::where('student_id', $singleStudent->student_id)
+                ->where('year_id', $yearId)
+                ->where('class_id', $classId);
+
+            if ($sectionId) {
+                $attendanceQuery->where(function ($query) use ($sectionId) {
+                    $query->where('section_id', $sectionId)->orWhereNull('section_id');
+                });
+            }
+
+            $attendanceRows = $attendanceQuery->get();
+            $attendance['opened'] = $attendanceRows->count();
+            $attendance['present'] = $attendanceRows->filter(fn ($row) => strtolower($row->attend_status) === 'present')->count();
+            $attendance['absent'] = $attendanceRows->filter(fn ($row) => strtolower($row->attend_status) === 'absent')->count();
+            $attendance['leave'] = $attendanceRows->filter(fn ($row) => strtolower($row->attend_status) === 'leave')->count();
+            $attendance['percentage'] = $attendance['opened'] > 0
+                ? round(($attendance['present'] / $attendance['opened']) * 100, 2)
+                : 0;
+        }
+
         $markingConfigQuery = ClassMarkingSetting::where('class_id', $classId)
             ->where(function ($query) use ($term) {
                 $query->where('term', $term)->orWhereNull('term');
@@ -94,7 +126,7 @@ class ReportCardService
             ->where('section_id', $sectionId)
             ->first();
 
-        $setting = SiteSetting::first();
+        $setting = SchoolSetting::first() ?: SiteSetting::first();
         $academicSetting = AcademicSetting::first();
         $assessmentAreas = $academicSetting->assessment_areas ?? ['Punctuality', 'Attendance', 'Neatness', 'Politeness', 'Honesty', 'Relationship_with_peers'];
 
@@ -109,7 +141,8 @@ class ReportCardService
             'classTeacher',
             'setting',
             'forPdf',
-            'assessmentAreas'
+            'assessmentAreas',
+            'attendance'
         ) + [
             'year_id' => $yearId,
             'class_id' => $classId,

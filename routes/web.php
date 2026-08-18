@@ -20,7 +20,9 @@ use App\Http\Controllers\Backend\ParentResultLinkController;
 use App\Http\Controllers\Backend\ParentController;
 use App\Models\SiteSetting;
 use App\Http\Controllers\Backend\EventController;
+use App\Http\Controllers\Backend\SchoolTimetableController;
 use App\Http\Controllers\Backend\LeaveRequestController;
+use App\Http\Controllers\Backend\AIController;
 
 use App\Http\Controllers\Backend\Student\StudentRegController;
 use App\Http\Controllers\Backend\Student\StudentRollController;
@@ -181,6 +183,14 @@ Route::prefix('events')->group(function(){
         Route::get('/delete/{id}', [EventController::class, 'DeleteEvent'])->name('event.delete');
         Route::get('/registrations/{event_id}', [EventController::class, 'ViewRegistrations'])->name('event.registrations.view');
     });
+});
+
+Route::middleware(['auth', 'role:Admin'])->prefix('timetable')->name('timetable.')->group(function () {
+    Route::get('/', [SchoolTimetableController::class, 'index'])->name('index');
+    Route::post('/', [SchoolTimetableController::class, 'store'])->name('store');
+    Route::get('/{timetable}/edit', [SchoolTimetableController::class, 'edit'])->name('edit');
+    Route::put('/{timetable}', [SchoolTimetableController::class, 'update'])->name('update');
+    Route::delete('/{timetable}', [SchoolTimetableController::class, 'destroy'])->name('destroy');
 });
 
 Route::middleware('role:Admin,Teacher,Staff')->prefix('leave-requests')->name('leave.requests.')->group(function () {
@@ -398,6 +408,7 @@ Route::get('/reg/details/{student_id}', [StudentRegController::class, 'StudentRe
 
 // Import/Export
 Route::get('/reg/export', [StudentRegController::class, 'StudentExport'])->name('student.registration.export');
+Route::get('/reg/import-template', [StudentRegController::class, 'StudentImportTemplate'])->name('student.registration.import-template');
 Route::post('/reg/import', [StudentRegController::class, 'StudentImport'])->name('student.registration.import');
 
 // Student Roll Generate Routes 
@@ -851,6 +862,17 @@ Route::middleware(['auth', 'role:Student', 'academic.context'])->prefix('student
     Route::get('cbt', [\App\Http\Controllers\Student\CbtController::class, 'index'])->name('student.cbt.index');
     Route::get('cbt/{quiz}/take', [\App\Http\Controllers\Student\CbtController::class, 'take'])->name('student.cbt.take');
     Route::get('cbt/result/{attempt}', [\App\Http\Controllers\Student\CbtController::class, 'result'])->name('student.cbt.result');
+});
+
+Route::middleware(['auth', 'role:Admin,Teacher'])->prefix('ai')->group(function () {
+    Route::get('tools', [AIController::class, 'tools'])->name('ai.tools');
+    Route::get('settings', [AIController::class, 'settings'])->name('ai.settings');
+    Route::post('settings', [AIController::class, 'updateSettings'])->name('ai.settings.update');
+    Route::post('assessment/{assessment}/comment', [AIController::class, 'generateComment'])->name('ai.assessment.comment');
+    Route::post('assessment/comments/bulk', [AIController::class, 'generateBulkComments'])->middleware('role:Admin')->name('ai.assessment.comments.bulk');
+    Route::post('lesson-plan', [AIController::class, 'lessonPlan'])->name('ai.lesson-plan');
+    Route::post('student-insight', [AIController::class, 'insight'])->name('ai.student-insight');
+    Route::post('expand-comment', [AIController::class, 'expandComment'])->name('ai.expand-comment');
 });
 
 /// Setting Routes 

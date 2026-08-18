@@ -1,9 +1,9 @@
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
-    # Skip if already inside /sms/public
-    RewriteCond %{REQUEST_URI} !^/sms/public
+    # Skip if already inside /portal/public
+    RewriteCond %{REQUEST_URI} !^/portal/public
 
-    # Redirect everything to /sms/public
-    RewriteRule ^(.*)$ /sms/public/$1 [R=302,L,QSA]
+    # Redirect to /portal/public
+    RewriteRule ^(.*)$ /portal/public/$1 [R=302,L,QSA]
 </IfModule>

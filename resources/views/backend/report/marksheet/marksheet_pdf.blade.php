@@ -535,19 +535,19 @@
                     <tbody>
                         <tr>
                             <td style="text-align:left;">NUMBER OF DAYS SCHOOL OPENED:</td>
-                            <td style="text-align:center;">---</td>
+                            <td style="text-align:center;">{{ $attendance['opened'] ?? 0 }}</td>
                         </tr>
                         <tr>
                             <td style="text-align:left;">NUMBER OF DAYS PRESENT:</td>
-                            <td style="text-align:center;">---</td>
+                            <td style="text-align:center;">{{ $attendance['present'] ?? 0 }}</td>
                         </tr>
                         <tr>
                             <td style="text-align:left;">NUMBER OF DAYS ABSENT:</td>
-                            <td style="text-align:center;">---</td>
+                            <td style="text-align:center;">{{ $attendance['absent'] ?? 0 }}</td>
                         </tr>
                         <tr>
                             <td style="text-align:left;">ATTENDANCE (%):</td>
-                            <td style="text-align:center;">---</td>
+                            <td style="text-align:center;">{{ number_format($attendance['percentage'] ?? 0, 2) }}%</td>
                         </tr>
                     </tbody>
                 </table>

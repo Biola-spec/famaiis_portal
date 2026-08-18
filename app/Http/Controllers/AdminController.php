@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use App\Services\SchoolScheduleService;
 
 class AdminController extends Controller
 {
@@ -20,6 +21,7 @@ class AdminController extends Controller
 
     public function Index(){
         $user = Auth::user();
+        $scheduleData = app(SchoolScheduleService::class)->dashboardData($user);
         if ($user->role === 'Teacher' || $user->role === 'Staff' || $user->hasRole('Teacher', 'Staff')) {
             // Fetch classes assigned to this teacher as a class teacher
             $assignedClassIds = \App\Models\AssignClassTeacher::where('teacher_id', $user->id)
@@ -75,7 +77,7 @@ class AdminController extends Controller
                 ->limit(5)
                 ->get();
             
-            return view('admin.teacher_index', $data);
+            return view('admin.teacher_index', array_merge($data, $scheduleData));
         }
 
         if ($user->role === 'Parent' || $user->hasRole('Parent')) {
@@ -182,7 +184,7 @@ class AdminController extends Controller
                 ->get();
         }
 
-        return view('admin.index', $data);
+        return view('admin.index', array_merge($data, $scheduleData));
     }
 
     private function safeCount(callable $query): int

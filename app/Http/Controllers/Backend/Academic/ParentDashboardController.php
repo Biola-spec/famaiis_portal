@@ -12,6 +12,7 @@ use App\Models\Term;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Services\SchoolScheduleService;
 
 class ParentDashboardController extends Controller
 {
@@ -112,7 +113,7 @@ class ParentDashboardController extends Controller
             'filters' => $filters,
             'paymentHistory' => $paymentHistory,
             'activeTab' => $activeTab,
-            'upcoming_events' => \App\Models\Event::where('event_date', '>=', date('Y-m-d'))->orderBy('event_date', 'asc')->limit(5)->get(),
+            ...app(SchoolScheduleService::class)->dashboardData($parent),
         ]);
     }
 }

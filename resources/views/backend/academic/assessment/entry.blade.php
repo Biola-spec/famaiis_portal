@@ -99,6 +99,7 @@
                                                 <th>Student Name</th>
                                                 <th>Cognitive Areas (1-5)</th>
                                                 <th>Class Teacher Comment</th>
+                                                <th>AI Assistant</th>
                                                 <th id="headTeacherHeader" class="d-none">Section Head Comment</th>
                                             </tr>
                                         </thead>
@@ -108,6 +109,11 @@
                                     </table>
                                 </div>
                                 <div class="text-xs-right mt-4">
+                                    @if(auth()->user()->hasRole('Admin'))
+                                        <button type="button" class="btn btn-outline-primary mr-2" id="btnBulkAiComments" disabled>
+                                            Generate All Report Comments
+                                        </button>
+                                    @endif
                                     <button type="submit" class="btn btn-rounded btn-info" id="btnSubmit">Save Assessments</button>
                                 </div>
                             </form>
@@ -187,6 +193,9 @@
                     response.students.forEach(function(student, index) {
                         let existingComment = student.existing && student.existing.teacher_comment ? student.existing.teacher_comment : '';
                         let existingCognitive = student.existing && student.existing.cognitive_areas ? student.existing.cognitive_areas : {};
+                        let assessmentId = student.existing && student.existing.id ? student.existing.id : '';
+                        let aiDraft = student.existing && student.existing.ai_comment_draft ? student.existing.ai_comment_draft : '';
+                        let aiFlag = student.existing && student.existing.ai_flag ? student.existing.ai_flag : '';
                         
                         let cognitiveHtml = '';
                         cognitiveAreas.forEach(function(area) {
@@ -213,6 +222,11 @@
                                 <td>
                                     <textarea name="assessments[${index}][teacher_comment]" class="form-control" rows="6" placeholder="Enter remark...">${existingComment}</textarea>
                                 </td>
+                                <td style="min-width: 190px;">
+                                    ${assessmentId ? `<button type="button" class="btn btn-sm btn-outline-primary ai-comment-button mb-2" data-assessment-id="${assessmentId}">Generate comment</button>` : '<small class="text-muted">Save assessment first</small>'}
+                                    <textarea class="form-control form-control-sm ai-comment-result" rows="5" readonly placeholder="AI draft appears here">${aiDraft}</textarea>
+                                    <small class="ai-comment-status text-muted">${aiFlag ? `Review flag: ${aiFlag}` : ''}</small>
+                                </td>
                                 <td class="${response.is_section_head ? '' : 'd-none'}">
                                     <textarea name="assessments[${index}][head_teacher_comment]" class="form-control" rows="6" placeholder="Enter section head remark...">${student.existing && student.existing.head_teacher_comment ? student.existing.head_teacher_comment : ''}</textarea>
                                 </td>
@@ -222,12 +236,46 @@
 
                     $('#studentsBody').html(html);
                     $('#studentsContainer').removeClass('d-none');
+                    $('#btnBulkAiComments').prop('disabled', $('.ai-comment-button').length === 0);
                     btn.prop('disabled', false).text('Search Students');
                 },
                 error: function(xhr) {
                     alert('Error loading students: ' + (xhr.responseJSON?.message || 'Unknown error'));
                     btn.prop('disabled', false).text('Search Students');
                 }
+            });
+            });
+
+        $(document).on('click', '.ai-comment-button', function () {
+            const button = $(this);
+            const cell = button.closest('td');
+            button.prop('disabled', true).text('Generating...');
+            $.post("{{ url('/ai/assessment') }}/" + button.data('assessment-id') + '/comment', {
+                _token: "{{ csrf_token() }}"
+            }).done(function (response) {
+                cell.find('.ai-comment-result').val(response.comment || 'Queued. Reload after processing to view the draft.');
+                cell.find('.ai-comment-status').text(response.flag ? 'Review flag: ' + response.flag : (response.status || 'Generated'));
+            }).fail(function (xhr) {
+                cell.find('.ai-comment-status').text(xhr.responseJSON?.message || 'Generation failed.');
+            }).always(function () {
+                button.prop('disabled', false).text('Generate comment');
+            });
+        });
+
+        $('#btnBulkAiComments').on('click', function () {
+            const button = $(this);
+            const ids = $('.ai-comment-button').map(function () { return $(this).data('assessment-id'); }).get();
+            if (!ids.length) return;
+            button.prop('disabled', true).text('Queueing...');
+            $.post("{{ route('ai.assessment.comments.bulk') }}", {
+                _token: "{{ csrf_token() }}",
+                assessment_ids: ids
+            }).done(function (response) {
+                alert(response.message || 'Report comments queued.');
+            }).fail(function (xhr) {
+                alert(xhr.responseJSON?.message || 'Bulk generation failed.');
+            }).always(function () {
+                button.prop('disabled', false).text('Generate All Report Comments');
             });
         });
     });

@@ -1,4 +1,4 @@
 <?php
-// Redirect to the Laravel public folder
-header('Location: /sms/public/');
+// Redirect to the portal Laravel public folder
+header('Location: /portal/public/');
 exit;

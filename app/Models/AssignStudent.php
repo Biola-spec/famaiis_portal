@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class AssignStudent extends Model
 {
+    protected $fillable = ['student_id', 'year_id', 'class_id', 'group_id'];
+
     public function student(){
     	return $this->belongsTo(User::class,'student_id','id');
     }

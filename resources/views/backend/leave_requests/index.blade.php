@@ -49,17 +49,18 @@
                                         </td>
                                         <td>{{ $leaveRequest->admin_comment ?: '-' }}</td>
                                         <td>
-                                            @if($isAdmin && $leaveRequest->status === 'pending')
-                                                <form action="{{ route('leave.requests.status', $leaveRequest) }}" method="POST" class="d-inline">
+                                            @if($isAdmin && in_array($leaveRequest->status, ['pending', 'approved', 'rejected'], true))
+                                                <form action="{{ route('leave.requests.status', $leaveRequest) }}" method="POST">
                                                     @csrf
-                                                    <input type="hidden" name="status" value="approved">
-                                                    <button class="btn btn-sm btn-success">Approve</button>
-                                                </form>
-                                                <form action="{{ route('leave.requests.status', $leaveRequest) }}" method="POST" class="mt-1">
-                                                    @csrf
-                                                    <input type="hidden" name="status" value="rejected">
-                                                    <input type="text" name="admin_comment" class="form-control form-control-sm mb-1" placeholder="Rejection reason">
-                                                    <button class="btn btn-sm btn-danger">Reject</button>
+                                                    <select name="status" class="form-control form-control-sm mb-1" aria-label="Leave decision">
+                                                        <option value="approved" {{ $leaveRequest->status === 'approved' ? 'selected' : '' }}>Approve</option>
+                                                        <option value="rejected" {{ $leaveRequest->status === 'rejected' ? 'selected' : '' }}>Reject</option>
+                                                    </select>
+                                                    <textarea name="admin_comment" class="form-control form-control-sm mb-1" rows="2" maxlength="2000" required placeholder="Decision comment">{{ $leaveRequest->admin_comment }}</textarea>
+                                                    <button class="btn btn-sm {{ $leaveRequest->status === 'pending' ? 'btn-primary' : 'btn-secondary' }}">
+                                                        <i class="fa {{ $leaveRequest->status === 'pending' ? 'fa-gavel' : 'fa-pencil' }}"></i>
+                                                        {{ $leaveRequest->status === 'pending' ? 'Review' : 'Edit decision' }}
+                                                    </button>
                                                 </form>
                                             @elseif(!$isAdmin && $leaveRequest->status === 'pending')
                                                 <form action="{{ route('leave.requests.cancel', $leaveRequest) }}" method="POST">
