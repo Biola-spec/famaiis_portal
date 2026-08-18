@@ -8,6 +8,7 @@ use Livewire\Attributes\On;
 use App\Models\User;
 use App\Models\ChatGroup;
 use App\Models\Message;
+use App\Models\ChatConnection;
 use Illuminate\Support\Facades\Auth;
 use App\Events\MessageSent;
 
@@ -36,6 +37,16 @@ class ChatBox extends Component
     #[On('chatSelected')]
     public function chatSelected($conversationId, $type)
     {
+        if ($type === 'private' && !ChatConnection::areConnected(Auth::id(), (int) $conversationId)) {
+            $this->reset('selectedConversation', 'type', 'message', 'attachment');
+            session()->flash('chat_error', 'This user is not connected for chat. Contact an administrator.');
+            return;
+        }
+
+        if ($type === 'group' && !Auth::user()->chatGroups()->whereKey($conversationId)->exists()) {
+            return;
+        }
+
         $this->selectedConversation = $conversationId;
         $this->type = $type;
         $this->reset('message', 'attachment', 'showGroupInfo', 'groupImage');
@@ -59,6 +70,15 @@ class ChatBox extends Component
     public function sendMessage()
     {
         if (!$this->message && !$this->attachment) return;
+
+        if ($this->type === 'private' && !ChatConnection::areConnected(Auth::id(), (int) $this->selectedConversation)) {
+            session()->flash('chat_error', 'This user is not connected for chat. Contact an administrator.');
+            return;
+        }
+
+        if ($this->type === 'group' && !Auth::user()->chatGroups()->whereKey($this->selectedConversation)->exists()) {
+            return;
+        }
 
         $filePath = null;
         $fileType = null;
@@ -218,6 +238,11 @@ class ChatBox extends Component
         if ($this->selectedConversation) {
             // Mark as seen during polling if active
             if ($this->type == 'private') {
+                if (!ChatConnection::areConnected(Auth::id(), (int) $this->selectedConversation)) {
+                    $this->reset('selectedConversation', 'type');
+                    return view('livewire.chat.chat-box', ['messages' => [], 'receiver' => null]);
+                }
+
                 Message::where('sender_id', $this->selectedConversation)
                     ->where('receiver_id', Auth::id())
                     ->whereNull('seen_at')
@@ -235,6 +260,11 @@ class ChatBox extends Component
                     ->orderBy('created_at', 'asc')
                     ->get();
             } else {
+                if (!Auth::user()->chatGroups()->whereKey($this->selectedConversation)->exists()) {
+                    $this->reset('selectedConversation', 'type');
+                    return view('livewire.chat.chat-box', ['messages' => [], 'receiver' => null]);
+                }
+
                 $receiver = ChatGroup::find($this->selectedConversation);
                 $messages = Message::where('group_id', $this->selectedConversation)
                     ->orderBy('created_at', 'asc')

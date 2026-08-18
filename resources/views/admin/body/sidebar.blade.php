@@ -54,6 +54,15 @@
           </a>
         </li>
 
+        @if($is_admin)
+        <li class="{{ str_starts_with($route ?? '', 'chat.connections.')?'active':'' }}">
+          <a href="{{ route('chat.connections.index') }}">
+            <i data-feather="link-2"></i>
+            <span>Chat Connections</span>
+          </a>
+        </li>
+        @endif
+
         <li class="{{ ($prefix == '/wallet')?'active':'' }}">
           <a href="{{ route('wallet.view') }}">
             <i data-feather="credit-card"></i>

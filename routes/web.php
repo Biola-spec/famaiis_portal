@@ -23,6 +23,7 @@ use App\Http\Controllers\Backend\EventController;
 use App\Http\Controllers\Backend\SchoolTimetableController;
 use App\Http\Controllers\Backend\LeaveRequestController;
 use App\Http\Controllers\Backend\AIController;
+use App\Http\Controllers\Backend\ChatConnectionController;
 
 use App\Http\Controllers\Backend\Student\StudentRegController;
 use App\Http\Controllers\Backend\Student\StudentRollController;
@@ -885,3 +886,8 @@ Route::middleware(['auth', 'role:Admin,Accountant'])->prefix('setting')->group(f
 
 // Chat Route
 Route::middleware(['auth'])->get('/chat', \App\Livewire\Chat\Chat::class)->name('chat.view');
+Route::middleware(['auth', 'role:Admin'])->prefix('chat/connections')->name('chat.connections.')->group(function () {
+    Route::get('/', [ChatConnectionController::class, 'index'])->name('index');
+    Route::post('/', [ChatConnectionController::class, 'store'])->name('store');
+    Route::delete('/{connection}', [ChatConnectionController::class, 'destroy'])->name('destroy');
+});

@@ -6,6 +6,7 @@ use Livewire\Component;
 use App\Models\User;
 use App\Models\ChatGroup;
 use App\Models\Message;
+use App\Models\ChatConnection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
@@ -37,6 +38,15 @@ class ChatList extends Component
 
     public function selectChat($id, $type)
     {
+        if ($type === 'private' && !ChatConnection::areConnected(Auth::id(), (int) $id)) {
+            session()->flash('chat_error', 'This user is not connected for chat. Contact an administrator.');
+            return;
+        }
+
+        if ($type === 'group' && !Auth::user()->chatGroups()->whereKey($id)->exists()) {
+            return;
+        }
+
         $this->dispatch('chatSelected', conversationId: $id, type: $type);
     }
 
@@ -46,6 +56,12 @@ class ChatList extends Component
             'groupName' => 'required|min:3',
             'selectedUsers' => 'required|array|min:1'
         ]);
+
+        $connectedIds = ChatConnection::connectedUserIds(Auth::id());
+        if (collect($this->selectedUsers)->diff($connectedIds)->isNotEmpty()) {
+            $this->addError('selectedUsers', 'You can only add users connected by an administrator.');
+            return;
+        }
 
         $group = ChatGroup::create([
             'name' => $this->groupName,
@@ -76,13 +92,14 @@ class ChatList extends Component
         }
         $this->unreadCount = $currentUnread;
 
+        $connectedUserIds = ChatConnection::connectedUserIds($authUserId);
+
         if ($this->search) {
-            $users = User::where(function($q) {
+            $users = User::whereIn('id', $connectedUserIds)->where(function($q) {
                     $q->where('name', 'like', '%' . $this->search . '%')
                       ->orWhere('role', 'like', '%' . $this->search . '%')
                       ->orWhere('id_no', 'like', '%' . $this->search . '%');
                 })
-                ->where('id', '!=', $authUserId)
                 ->limit(25)
                 ->get();
             
@@ -91,31 +108,10 @@ class ChatList extends Component
             // Get all groups I am a member of
             $groups = Auth::user()->chatGroups;
 
-            // Get users with history first
-            $usersWithHistory = User::where('id', '!=', $authUserId)
-                ->where(function($q) use ($authUserId) {
-                    $q->whereHas('sentMessages', function($sq) use ($authUserId) {
-                        $sq->where('receiver_id', $authUserId);
-                    })
-                    ->orWhereHas('receivedMessages', function($rq) use ($authUserId) {
-                        $rq->where('sender_id', $authUserId);
-                    });
-                })->get();
-
-            // If history is empty, just get some users
-            if ($usersWithHistory->isEmpty()) {
-                $users = User::where('id', '!=', $authUserId)->limit(30)->get();
-            } else {
-                // Merge with some non-history users to ensure the list is never empty
-                $otherUsers = User::where('id', '!=', $authUserId)
-                    ->whereNotIn('id', $usersWithHistory->pluck('id'))
-                    ->limit(10)
-                    ->get();
-                $users = $usersWithHistory->concat($otherUsers);
-            }
+            $users = User::whereIn('id', $connectedUserIds)->orderBy('name')->get();
         }
 
-        $modalUsersQuery = User::where('id', '!=', Auth::id());
+        $modalUsersQuery = User::whereIn('id', $connectedUserIds);
         if ($this->userSearch) {
             $modalUsersQuery->where(function($q) {
                 $q->where('name', 'like', '%' . $this->userSearch . '%')

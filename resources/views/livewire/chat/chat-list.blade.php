@@ -17,6 +17,9 @@
 
     <!-- Search Bar -->
     <div class="p-10" style="background: #fff; flex-shrink: 0;">
+        @if(session('chat_error'))
+            <div class="alert alert-warning py-5 px-10 mb-10 font-size-12">{{ session('chat_error') }}</div>
+        @endif
         <div class="search-container position-relative">
             <i class="fa fa-search position-absolute text-muted" style="left: 15px; top: 10px;"></i>
             <input type="text" wire:model.live="search" placeholder="Search or start new chat" 
@@ -94,7 +97,8 @@
         @if($users->count() == 0 && $groups->count() == 0)
             <div class="p-40 text-center text-muted">
                 <i class="fa fa-comments font-size-50 mb-10" style="opacity: 0.1;"></i>
-                <p>No conversations found.</p>
+                <p>No connected conversations found.</p>
+                <small>Ask an administrator to connect the users who should be able to chat.</small>
             </div>
         @endif
     </div>
