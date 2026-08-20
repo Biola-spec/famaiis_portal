@@ -34,23 +34,7 @@ class StudentRegController extends Controller
         $data['class_id'] = $request->class_id;
         $data['search_query'] = $request->search_query;
 
-    	$data['allData']  = AssignStudent::with(['student', 'student_year', 'student_class', 'discount'])
-            ->whereHas('student')
-            ->when($request->year_id, function($query) use ($request) {
-                return $query->where('year_id', $request->year_id);
-            })
-            ->when($request->class_id, function($query) use ($request) {
-                return $query->where('class_id', $request->class_id);
-            })
-            ->when($request->search_query, function($query) use ($request) {
-                return $query->whereHas('student', function($q) use ($request) {
-                    $q->where('name', 'like', '%'.$request->search_query.'%')
-                      ->orWhere('first_name', 'like', '%'.$request->search_query.'%')
-                      ->orWhere('surname', 'like', '%'.$request->search_query.'%')
-                      ->orWhere('middle_name', 'like', '%'.$request->search_query.'%')
-                      ->orWhere('id_no', 'like', '%'.$request->search_query.'%');
-                });
-            })
+    	$data['allData']  = $this->studentRegistrationQuery($request)
             ->latest()
             ->paginate(10)
             ->withQueryString();
@@ -70,19 +54,7 @@ class StudentRegController extends Controller
     	$data['class_id'] = $request->class_id;
         $data['search_query'] = $request->search_query;
 
-    	$data['allData'] = AssignStudent::with(['student', 'student_year', 'student_class', 'discount'])
-            ->whereHas('student')
-            ->where('year_id', $request->year_id)
-            ->where('class_id', $request->class_id)
-            ->when($request->search_query, function($query) use ($request) {
-                return $query->whereHas('student', function($q) use ($request) {
-                    $q->where('name', 'like', '%'.$request->search_query.'%')
-                      ->orWhere('first_name', 'like', '%'.$request->search_query.'%')
-                      ->orWhere('surname', 'like', '%'.$request->search_query.'%')
-                      ->orWhere('middle_name', 'like', '%'.$request->search_query.'%')
-                      ->orWhere('id_no', 'like', '%'.$request->search_query.'%');
-                });
-            })
+    	$data['allData'] = $this->studentRegistrationQuery($request)
             ->latest()
             ->paginate(10)
             ->withQueryString();
@@ -113,23 +85,38 @@ class StudentRegController extends Controller
 
     private function studentRegistrationQuery(Request $request)
     {
-        return AssignStudent::with(['student', 'student_year', 'student_class', 'discount'])
-            ->whereHas('student')
-            ->when($request->year_id, function($query) use ($request) {
-                return $query->where('year_id', $request->year_id);
-            })
-            ->when($request->class_id, function($query) use ($request) {
-                return $query->where('class_id', $request->class_id);
-            })
-            ->when($request->search_query, function($query) use ($request) {
-                return $query->whereHas('student', function($q) use ($request) {
-                    $q->where('name', 'like', '%'.$request->search_query.'%')
-                      ->orWhere('first_name', 'like', '%'.$request->search_query.'%')
-                      ->orWhere('surname', 'like', '%'.$request->search_query.'%')
-                      ->orWhere('middle_name', 'like', '%'.$request->search_query.'%')
-                      ->orWhere('id_no', 'like', '%'.$request->search_query.'%');
-                });
+        $query = AssignStudent::with(['student', 'student_year', 'student_class', 'discount'])
+            ->whereHas('student');
+
+        if ($request->year_id) {
+            $query->where('year_id', $request->year_id);
+        }
+
+        if ($request->class_id) {
+            $query->where('class_id', $request->class_id);
+        }
+
+        if ($request->search_query) {
+            $query->whereHas('student', function($q) use ($request) {
+                $q->where('name', 'like', '%'.$request->search_query.'%')
+                  ->orWhere('first_name', 'like', '%'.$request->search_query.'%')
+                  ->orWhere('surname', 'like', '%'.$request->search_query.'%')
+                  ->orWhere('middle_name', 'like', '%'.$request->search_query.'%')
+                  ->orWhere('id_no', 'like', '%'.$request->search_query.'%');
             });
+        }
+
+        // When no specific session (year_id) or class (class_id) filter is selected,
+        // show only the latest enrollment record per student so students aren't duplicated on the main view tab.
+        if (!$request->year_id && !$request->class_id) {
+            $latestIds = AssignStudent::select(DB::raw('MAX(id) as max_id'))
+                ->groupBy('student_id')
+                ->pluck('max_id');
+
+            $query->whereIn('id', $latestIds);
+        }
+
+        return $query;
     }
 
     public function StudentRegAdd(){
