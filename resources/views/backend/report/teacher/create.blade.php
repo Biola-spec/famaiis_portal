@@ -1,6 +1,5 @@
 @extends('admin.admin_master')
 @section('admin')
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 
 <div class="content-wrapper">
     <div class="container-full">
@@ -146,8 +145,8 @@
 </div>
 
 <script src="{{ asset('assets/vendor_components/ckeditor/ckeditor.js') }}"></script>
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<link href="{{ asset('assets/vendor_components/select2/dist/css/select2.min.css') }}" rel="stylesheet" />
+<script src="{{ asset('assets/vendor_components/select2/dist/js/select2.full.min.js') }}"></script>
 
 <script>
     $(document).ready(function() {

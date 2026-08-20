@@ -1,8 +1,7 @@
 @extends('admin.admin_master')
 @section('admin')
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 <!-- Select2 CSS -->
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link href="{{ asset('assets/vendor_components/select2/dist/css/select2.min.css') }}" rel="stylesheet" />
 <style>
     /* Theme-aware Select2 custom styles */
     .select2-container--default .select2-selection--single {
@@ -227,7 +226,7 @@
   </div>
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="{{ asset('assets/vendor_components/select2/dist/js/select2.full.min.js') }}"></script>
 
 <script type="text/javascript">
 	$(document).ready(function(){

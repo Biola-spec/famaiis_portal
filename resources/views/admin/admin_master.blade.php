@@ -21,7 +21,7 @@
         <link rel="stylesheet" href="{{ asset('backend/css/style_rtl.css') }}">
     @endif
    
- <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.css" >
+<link rel="stylesheet" type="text/css" href="{{ asset('backend/css/toastr.css') }}" >
  @livewireStyles
       
     <style>
@@ -931,7 +931,7 @@
 	<script src="{{ asset('backend/js/pages/dashboard.js') }}"></script>
 	
 
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
+<script src="{{ asset('backend/js/sweetalert2.all.min.js') }}"></script>
 
 <script type="text/javascript">
   $(function(){
@@ -968,7 +968,7 @@
 </script> 
 
 
-<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+<script type="text/javascript" src="{{ asset('backend/js/toastr.min.js') }}"></script>
 
  <script>
   @if(Session::has('message'))

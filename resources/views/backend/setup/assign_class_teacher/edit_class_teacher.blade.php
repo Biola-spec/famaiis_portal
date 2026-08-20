@@ -103,8 +103,7 @@
 	  </div>
   </div>
 
- <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
- <script type="text/javascript">
+  <script type="text/javascript">
     $(document).on('change', '#section_id', function() {
         var section_id = $(this).val();
         $('#class_id').prop('disabled', true).html('<option value="">Loading...</option>');

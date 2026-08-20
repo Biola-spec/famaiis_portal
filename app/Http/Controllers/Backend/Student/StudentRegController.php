@@ -141,10 +141,9 @@ class StudentRegController extends Controller
     	$data['groups']  = StudentGroup::all();
     	$data['terms']   = Term::all();
         $data['parents'] = User::select('id', 'name', 'email')
-            ->where('role', 'Parent')
-            ->orWhere('usertype', 'Parent')
-            ->orWhereHas('roles', function($q){
-                $q->where('name', 'Parent');
+            ->where(function($q) {
+                $q->where('role', 'Parent')
+                  ->orWhere('usertype', 'Parent');
             })->get();
         $data['sections'] = SchoolSection::all();
     	return view('backend.student.student_reg.student_add', $data);
