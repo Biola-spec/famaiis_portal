@@ -25,10 +25,10 @@
 
 <div class="col-md-3">
     <div class="form-group">
-		<h5>Current Year <span class="text-danger">*</span></h5>
+		<h5>Current Session <span class="text-danger">*</span></h5>
 		<div class="controls">
 	 <select name="current_year_id" id="current_year_id" required="" class="form-control">
-			<option value="" selected="" disabled="">Select Year</option>
+			<option value="" selected="" disabled="">Select Session</option>
 			 @foreach($years as $year)
                 <option value="{{ $year->id }}" >{{ $year->name }}</option>
 		 	@endforeach
@@ -41,7 +41,7 @@
     <div class="form-group">
 		<h5>Current Class <span class="text-danger">*</span></h5>
 		<div class="controls">
-	 <select name="current_class_id" id="current_class_id"  required="" class="form-control">
+	 <select name="current_class_id" id="current_class_id" required="" class="form-control">
 			<option value="" selected="" disabled="">Select Class</option>
 			 @foreach($classes as $class)
 			    <option value="{{ $class->id }}">{{ $class->name }}</option>
@@ -52,15 +52,15 @@
 </div> <!-- End Col md 3 --> 
 
 <div class="col-md-2" style="padding-top: 25px;">
-    <a id="search" class="btn btn-primary" name="search"> Search Students</a>
+    <button type="button" id="search" class="btn btn-primary">Search Students</button>
 </div> <!-- End Col md 2 --> 		
 
 <div class="col-md-2">
     <div class="form-group">
-		<h5>Target Year <span class="text-danger">*</span></h5>
+		<h5>Target Session <span class="text-danger">*</span></h5>
 		<div class="controls">
 	 <select name="target_year_id" id="target_year_id" required="" class="form-control">
-			<option value="" selected="" disabled="">Select Year</option>
+			<option value="" selected="" disabled="">Select Session</option>
 			 @foreach($years as $year)
                 <option value="{{ $year->id }}" >{{ $year->name }}</option>
 		 	@endforeach
@@ -73,7 +73,7 @@
     <div class="form-group">
 		<h5>Target Class <span class="text-danger">*</span></h5>
 		<div class="controls">
-	 <select name="target_class_id" id="target_class_id"  required="" class="form-control">
+	 <select name="target_class_id" id="target_class_id" required="" class="form-control">
 			<option value="" selected="" disabled="">Select Class</option>
 			 @foreach($classes as $class)
 			    <option value="{{ $class->id }}">{{ $class->name }}</option>
@@ -133,46 +133,56 @@
 	  </div>
   </div>
 
-
+@push('scripts')
 <script type="text/javascript">
-  $(document).on('click','#search',function(){
-    var year_id = $('#current_year_id').val();
-    var class_id = $('#current_class_id').val();
+  $(document).ready(function() {
+      $('#search').on('click', function() {
+          var year_id = $('#current_year_id').val();
+          var class_id = $('#current_class_id').val();
 
-    if(!year_id || !class_id){
-        alert('Please select current year and class');
-        return;
-    }
+          if(!year_id || !class_id){
+              alert('Please select current session and class');
+              return;
+          }
 
-     $.ajax({
-      url: "{{ route('student.promotion.group.getstudents')}}",
-      type: "GET",
-      data: {'year_id':year_id,'class_id':class_id},
-      success: function (data) {
-        $('#student-list-div').removeClass('d-none');
-        var html = '';
-        $.each( data, function(key, v){
-          html +=
-          '<tr>'+
-          '<td><input type="checkbox" name="student_ids[]" id="student_'+v.student_id+'" value="'+v.student_id+'" class="student_checkbox filled-in chk-col-primary"><label for="student_'+v.student_id+'"></label></td>'+
-          '<td>'+v.student.id_no+'</td>'+
-          '<td>'+v.student.name+'</td>'+
-          '<td>'+(v.roll || 'N/A')+'</td>'+
-          '<td>'+v.student.gender+'</td>'+
-          '</tr>';
-        });
-        $('#student-list-body').html(html);
-      }
-    });
+          $.ajax({
+              url: "{{ route('student.promotion.group.getstudents') }}",
+              type: "GET",
+              data: {'year_id': year_id, 'class_id': class_id},
+              success: function (data) {
+                  $('#student-list-div').removeClass('d-none');
+                  var html = '';
+                  if (data && data.length > 0) {
+                      $.each(data, function(key, v) {
+                          if (v.student) {
+                              html +=
+                              '<tr>'+
+                              '<td><input type="checkbox" name="student_ids[]" id="student_'+v.student_id+'" value="'+v.student_id+'" class="student_checkbox filled-in chk-col-primary"><label for="student_'+v.student_id+'"></label></td>'+
+                              '<td>'+(v.student.id_no || '')+'</td>'+
+                              '<td>'+(v.student.name || '')+'</td>'+
+                              '<td>'+(v.roll || 'N/A')+'</td>'+
+                              '<td>'+(v.student.gender || '')+'</td>'+
+                              '</tr>';
+                          }
+                      });
+                  } else {
+                      html = '<tr><td colspan="5" class="text-center text-danger">No students found for the selected session and class.</td></tr>';
+                  }
+                  $('#student-list-body').html(html);
+              },
+              error: function(err) {
+                  console.error('Error fetching students:', err);
+                  alert('Failed to load students. Please try again.');
+              }
+          });
+      });
+
+      // Select all functionality
+      $(document).on('change', '#select_all', function() {
+          $('.student_checkbox').prop('checked', $(this).prop('checked'));
+      });
   });
-
-  // Select all functionality
-  $(document).on('change', '#select_all', function(){
-      $('.student_checkbox').prop('checked', $(this).prop('checked'));
-  });
-
 </script>
-
-
+@endpush
 
 @endsection

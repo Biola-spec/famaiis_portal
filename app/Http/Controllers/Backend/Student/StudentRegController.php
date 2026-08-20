@@ -610,7 +610,11 @@ class StudentRegController extends Controller
     }
 
     public function GroupPromotionGetStudents(Request $request){
-    	$allData = AssignStudent::with(['student'])->where('year_id', $request->year_id)->where('class_id', $request->class_id)->get();
+    	$allData = AssignStudent::with(['student'])
+            ->where('year_id', $request->year_id)
+            ->where('class_id', $request->class_id)
+            ->whereHas('student')
+            ->get();
     	return response()->json($allData);
     }
 
@@ -620,19 +624,24 @@ class StudentRegController extends Controller
             return redirect()->back()->with(['message' => 'Please select at least one student', 'alert-type' => 'error']);
         }
 
+        $current_year_id = $request->current_year_id ?? $request->year_id;
+        $current_class_id = $request->current_class_id ?? $request->class_id;
+        $target_year_id = $request->target_year_id;
+        $target_class_id = $request->target_class_id;
+
         // Check if target is same as source
-        if ($request->year_id == $request->target_year_id && $request->class_id == $request->target_class_id) {
+        if ($current_year_id == $target_year_id && $current_class_id == $target_class_id) {
             return redirect()->back()->with(['message' => 'Target Class and Session must be different from the Source.', 'alert-type' => 'error']);
         }
 
-    	DB::transaction(function() use($request, $student_ids){
+    	DB::transaction(function() use($request, $student_ids, $target_year_id, $target_class_id){
             foreach ($student_ids as $student_id) {
                 $existing = AssignStudent::where('student_id', $student_id)->orderBy('id', 'desc')->first();
 
                 $assign_student = new AssignStudent();
                 $assign_student->student_id = $student_id;
-                $assign_student->year_id    = $request->target_year_id;
-                $assign_student->class_id   = $request->target_class_id;
+                $assign_student->year_id    = $target_year_id;
+                $assign_student->class_id   = $target_class_id;
                 $assign_student->group_id   = optional($existing)->group_id;
                 $assign_student->save();
 
@@ -641,6 +650,26 @@ class StudentRegController extends Controller
                 $discount->fee_category_id   = '1';
                 $discount->discount          = 0;
                 $discount->save();
+
+                // Section enrollment pivot update
+                $user = User::find($student_id);
+                if ($user && $user->section_id) {
+                    DB::table('student_section')
+                        ->where('student_id', $student_id)
+                        ->where('is_active', true)
+                        ->update(['is_active' => false]);
+
+                    DB::table('student_section')->insert([
+                        'student_id'      => $student_id,
+                        'section_id'      => $user->section_id,
+                        'class_id'        => $target_class_id,
+                        'year_id'         => $target_year_id,
+                        'is_active'       => true,
+                        'enrollment_date' => now()->toDateString(),
+                        'created_at'      => now(),
+                        'updated_at'      => now(),
+                    ]);
+                }
             }
     	});
 
