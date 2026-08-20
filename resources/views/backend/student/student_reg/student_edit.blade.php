@@ -279,6 +279,31 @@
 			reader.readAsDataURL(e.target.files['0']);
 		});
 
+        // Preload locations data
+        let locationData = null;
+
+        function getLocationData() {
+            if (locationData) {
+                return Promise.resolve(locationData);
+            }
+            return fetch('{{ asset('locations.json') }}')
+                .then(function(res) {
+                    if (!res.ok) throw new Error('Failed to fetch locations');
+                    return res.json();
+                })
+                .then(function(data) {
+                    locationData = data;
+                    return data;
+                })
+                .catch(function(err) {
+                    console.error('Locations load error:', err);
+                    return null;
+                });
+        }
+
+        // Kick off preloading immediately
+        getLocationData();
+
         // Location Logic
         const savedState = "{{ $editData['student']['state'] }}";
         const savedLga = "{{ $editData['student']['lga'] }}";
@@ -293,20 +318,18 @@
                 lgaSelect.html('<option value="" selected="" disabled="">Select LGA</option>');
             }
 
-            fetch('{{ asset('locations.json') }}')
-                .then(response => response.json())
-                .then(data => {
+            getLocationData().then(function(data) {
+                stateSelect.html('<option value="" selected="" disabled="">Select State</option>');
+                if (data && country && data[country]) {
                     const states = data[country];
-                    stateSelect.html('<option value="" selected="" disabled="">Select State</option>');
-                    if (states) {
-                        Object.keys(states).forEach(state => {
-                            stateSelect.append(`<option value="${state}" ${state == savedState ? 'selected' : ''}>${state}</option>`);
-                        });
-                        if(isInitial && savedState) {
-                            stateSelect.trigger('change', [true]);
-                        }
+                    Object.keys(states).forEach(function(state) {
+                        stateSelect.append('<option value="' + state + '" ' + (state == savedState ? 'selected' : '') + '>' + state + '</option>');
+                    });
+                    if(isInitial && savedState) {
+                        stateSelect.trigger('change', [true]);
                     }
-                });
+                }
+            });
         });
 
         $('#state_id').on('change', function(e, isInitial) {
@@ -318,17 +341,15 @@
                 lgaSelect.html('<option value="" selected="" disabled="">Loading...</option>');
             }
 
-            fetch('{{ asset('locations.json') }}')
-                .then(response => response.json())
-                .then(data => {
+            getLocationData().then(function(data) {
+                lgaSelect.html('<option value="" selected="" disabled="">Select LGA</option>');
+                if (data && country && state && data[country] && data[country][state]) {
                     const lgas = data[country][state];
-                    lgaSelect.html('<option value="" selected="" disabled="">Select LGA</option>');
-                    if (lgas) {
-                        lgas.forEach(lga => {
-                            lgaSelect.append(`<option value="${lga}" ${lga == savedLga ? 'selected' : ''}>${lga}</option>`);
-                        });
-                    }
-                });
+                    lgas.forEach(function(lga) {
+                        lgaSelect.append('<option value="' + lga + '" ' + (lga == savedLga ? 'selected' : '') + '>' + lga + '</option>');
+                    });
+                }
+            });
         });
 
         // Section to Class Filtering
