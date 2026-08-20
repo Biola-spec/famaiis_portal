@@ -31,20 +31,27 @@
 
 <table id="customers">
   <tr>
-    <td><h2>
-  <?php $image_path = '/' . $setting->logo; ?>
-  <img src="{{ public_path() . $image_path }}" width="200" height="100">
-
-    </h2></td>
-    <td><h2>{{ $setting->school_name }}</h2>
-<p>School Address</p>
-<p>Phone : 343434343434</p>
-<p>Email : {{ $setting->school_email }}</p>
-<p> <b> Employee Registration Page </b> </p>
+    <td style="width: 25%; text-align: center;">
+      @if(!empty($setting->logo) && file_exists(public_path($setting->logo)))
+        <img src="{{ public_path($setting->logo) }}" width="100" height="100" style="object-fit: contain;">
+      @endif
+    </td>
+    <td style="width: 50%; text-align: center;">
+      <h2>{{ $setting->school_name ?? 'School Portal' }}</h2>
+      <p>{{ $setting->address ?? '' }}</p>
+      <p>Phone : {{ $setting->phone_one ?? '' }}</p>
+      <p>Email : {{ $setting->school_email ?? '' }}</p>
+      <p><b>Employee Registration Details</b></p>
     </td> 
+    <td style="width: 25%; text-align: center;">
+      @php
+        $empImage = (!empty($details->image) && file_exists(public_path('upload/employee_images/' . $details->image))) 
+          ? public_path('upload/employee_images/' . $details->image) 
+          : public_path('upload/no_image.jpg');
+      @endphp
+      <img src="{{ $empImage }}" width="100" height="100" style="border: 1px solid #000; object-fit: cover;">
+    </td>
   </tr>
-  
-   
 </table>
 
 

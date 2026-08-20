@@ -297,6 +297,7 @@
 	  </div>
   </div>
 
+@push('scripts')
 <script type="text/javascript">
 	$(document).ready(function(){
 		$('#image').change(function(e){
@@ -304,7 +305,9 @@
 			reader.onload = function(e){
 				$('#showImage').attr('src',e.target.result);
 			}
-			reader.readAsDataURL(e.target.files[0]);
+			if (e.target.files && e.target.files[0]) {
+				reader.readAsDataURL(e.target.files[0]);
+			}
 		});
 
         // Show/Hide section assignment based on role
@@ -318,6 +321,7 @@
         });
 	});
 </script>
+@endpush
 
 
 
