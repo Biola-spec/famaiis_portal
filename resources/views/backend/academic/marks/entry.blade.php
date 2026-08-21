@@ -138,7 +138,7 @@
                                                 <select name="year_id" id="year_id" required class="form-control">
                                                     <option value="" selected disabled>Select Session</option>
                                                     @foreach($years as $year)
-                                                        <option value="{{ $year->id }}">{{ $year->name }}</option>
+                                                        <option value="{{ $year->id }}" {{ optional($currentSession)->id == $year->id ? 'selected' : '' }}>{{ $year->name }}</option>
                                                     @endforeach
                                                 </select>
                                             </div>
@@ -161,8 +161,11 @@
                                         <div class="form-group">
                                             <h5>Class <span class="text-danger"> </span></h5>
                                             <div class="controls">
-                                                <select name="class_id" id="class_id" required class="form-control" disabled>
+                                                <select name="class_id" id="class_id" required class="form-control">
                                                     <option value="" selected disabled>Select Class</option>
+                                                    @foreach($classes as $class)
+                                                        <option value="{{ $class->id }}">{{ $class->name }}</option>
+                                                    @endforeach
                                                 </select>
                                             </div>
                                         </div>
@@ -184,8 +187,11 @@
                                         <div class="form-group">
                                             <h5>Subject <span class="text-danger"> </span></h5>
                                             <div class="controls">
-                                                <select name="subject_id" id="subject_id" required class="form-control" disabled>
+                                                <select name="subject_id" id="subject_id" required class="form-control">
                                                     <option value="" selected disabled>Select Subject</option>
+                                                    @foreach($subjects as $subject)
+                                                        <option value="{{ $subject->id }}">{{ $subject->name }}</option>
+                                                    @endforeach
                                                 </select>
                                             </div>
                                         </div>
@@ -233,6 +239,9 @@
     </div>
 </div>
 
+@endsection
+
+@push('scripts')
 <script type="text/javascript">
     let currentSetting = null;
 
@@ -259,29 +268,46 @@
 
     $(document).on('change', '#section_id', function () {
         const sectionId = $(this).val();
+        const yearId = $('#year_id').val();
         $('#class_id').prop('disabled', true).html('<option value="">Loading...</option>');
-        $('#subject_id').prop('disabled', true).html('<option value="">Select Subject</option>');
+        $('#subject_id').html('<option value="" selected disabled>Select Subject</option>');
 
-        $.get("{{ route('academic.marks.classes') }}", { section_id: sectionId }, function (classes) {
+        $.get("{{ route('academic.marks.classes') }}", { section_id: sectionId, year_id: yearId }, function (classes) {
             let html = '<option value="" selected disabled>Select Class</option>';
-            $.each(classes, function (_, studentClass) {
-                html += `<option value="${studentClass.id}">${studentClass.name}</option>`;
-            });
+            if (classes && classes.length > 0) {
+                $.each(classes, function (_, studentClass) {
+                    html += `<option value="${studentClass.id}">${studentClass.name}</option>`;
+                });
+            } else {
+                html = '<option value="" selected disabled>No classes found</option>';
+            }
             $('#class_id').html(html).prop('disabled', false);
+        }).fail(function () {
+            $('#class_id').prop('disabled', false);
         });
+    });
+
+    $(document).on('change', '#year_id', function () {
+        $('#section_id').trigger('change');
     });
 
     $(document).on('change', '#class_id', function () {
         const classId = $(this).val();
         const sectionId = $('#section_id').val();
-        $('#subject_id').prop('disabled', true).html('<option value="">Loading...</option>');
+        if (!classId) return;
 
         $.get("{{ route('academic.marks.subjects') }}", { class_id: classId, section_id: sectionId }, function (subjects) {
             let html = '<option value="" selected disabled>Select Subject</option>';
-            $.each(subjects, function (_, subject) {
-                html += `<option value="${subject.id}">${subject.name}</option>`;
-            });
+            if (subjects && subjects.length > 0) {
+                $.each(subjects, function (_, subject) {
+                    html += `<option value="${subject.id}">${subject.name}</option>`;
+                });
+            } else {
+                html = '<option value="" selected disabled>No subjects found</option>';
+            }
             $('#subject_id').html(html).prop('disabled', false);
+        }).fail(function () {
+            $('#subject_id').prop('disabled', false);
         });
     });
 
@@ -290,65 +316,86 @@
         const sectionId = $('#section_id').val();
         const subjectId = $('#subject_id').val();
         const term = $('#term').val();
+        const yearId = $('#year_id').val();
+
+        if (!yearId || !classId || !subjectId || !term) {
+            alert('Please select Session, Class, Term, and Subject first before loading students.');
+            return $.Deferred().reject({ responseJSON: { message: 'Please select Session, Class, Term, and Subject first.' } }).promise();
+        }
+
+        const $btn = $('#load-context');
+        const originalHtml = $btn.html();
+        $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Loading...');
 
         return $.get("{{ route('academic.marks.context') }}", {
             class_id: classId,
             section_id: sectionId,
             subject_id: subjectId,
-            term: term
+            term: term,
+            year_id: yearId
         }).then(function (response) {
-            currentSetting = response.setting;
+            currentSetting = response.setting || {};
 
             let header = '<th>ID No</th><th>Student</th><th>Gender</th>';
             const ordinals = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'];
             const customLabels = currentSetting.ca_labels || [];
-            for (let i = 1; i <= parseInt(currentSetting.ca_count); i++) {
+            const caCount = parseInt(currentSetting.ca_count || 2);
+
+            for (let i = 1; i <= caCount; i++) {
                 const label = customLabels[i-1] || `${ordinals[i-1] || i} CA`;
                 const maxWeight = currentSetting.ca_weights && currentSetting.ca_weights[i-1] ? currentSetting.ca_weights[i-1] : '';
                 header += `<th>${labelWithMax(label, maxWeight).html}</th>`;
             }
-            header += `<th>${labelWithMax(currentSetting.exam_label || 'Exam', currentSetting.exam_weight).html}</th>`;
+            header += `<th>${labelWithMax(currentSetting.exam_label || 'Exam', currentSetting.exam_weight || 60).html}</th>`;
             if (currentSetting.project_enabled) {
                 header += '<th>Project</th>';
             }
             $('#marks-header-row').html(header);
 
             let body = '';
-            $.each(response.students, function (index, student) {
-                const existing = student.existing || {};
-                body += `<tr>
-                    <td data-label="ID No">${escapeHtml(student.id_no || '')}<input type="hidden" name="student_marks[${index}][student_id]" value="${escapeHtml(student.student_id)}"><input type="hidden" name="student_marks[${index}][id_no]" value="${escapeHtml(student.id_no || '')}"></td>
-                    <td data-label="Student">${escapeHtml(student.name || '')}</td>
-                    <td data-label="Gender">${escapeHtml(student.gender || '')}</td>`;
+            if (response.students && response.students.length > 0) {
+                $.each(response.students, function (index, student) {
+                    const existing = student.existing || {};
+                    body += `<tr>
+                        <td data-label="ID No">${escapeHtml(student.id_no || '')}<input type="hidden" name="student_marks[${index}][student_id]" value="${escapeHtml(student.student_id)}"><input type="hidden" name="student_marks[${index}][id_no]" value="${escapeHtml(student.id_no || '')}"></td>
+                        <td data-label="Student">${escapeHtml(student.name || '')}</td>
+                        <td data-label="Gender">${escapeHtml(student.gender || '')}</td>`;
 
-                const existingCa = existing.ca_breakdown ? existing.ca_breakdown : [];
-                for (let i = 0; i < parseInt(currentSetting.ca_count); i++) {
-                    const value = existingCa[i] !== undefined && existingCa[i] !== null ? existingCa[i] : '';
-                    const maxWeight = currentSetting.ca_weights && currentSetting.ca_weights[i] ? currentSetting.ca_weights[i] : '100';
-                    const customLabel = customLabels[i] || `${ordinals[i] || i + 1} CA`;
-                    const caLabel = labelWithMax(customLabel, maxWeight).text;
-                    body += `<td data-label="${caLabel}"><input type="number" min="0" max="${escapeHtml(maxWeight)}" step="0.01" class="form-control form-control-sm" name="student_marks[${index}][ca][${i}]" value="${escapeHtml(value)}"></td>`;
-                }
+                    const existingCa = existing.ca_breakdown ? existing.ca_breakdown : [];
+                    for (let i = 0; i < caCount; i++) {
+                        const value = existingCa[i] !== undefined && existingCa[i] !== null ? existingCa[i] : '';
+                        const maxWeight = currentSetting.ca_weights && currentSetting.ca_weights[i] ? currentSetting.ca_weights[i] : '100';
+                        const customLabel = customLabels[i] || `${ordinals[i] || i + 1} CA`;
+                        const caLabel = labelWithMax(customLabel, maxWeight).text;
+                        body += `<td data-label="${caLabel}"><input type="number" min="0" max="${escapeHtml(maxWeight)}" step="0.01" class="form-control form-control-sm" name="student_marks[${index}][ca][${i}]" value="${escapeHtml(value)}"></td>`;
+                    }
 
-                const maxExamWeight = currentSetting.exam_weight || '100';
-                const examLabel = labelWithMax(currentSetting.exam_label || 'Exam', maxExamWeight).text;
-                body += `<td data-label="${examLabel}"><input type="number" min="0" max="${escapeHtml(maxExamWeight)}" step="0.01" class="form-control form-control-sm" name="student_marks[${index}][exam_score]" value="${escapeHtml(existing.exam_score !== null && existing.exam_score !== undefined ? existing.exam_score : '')}"></td>`;
-                if (currentSetting.project_enabled) {
-                    body += `<td data-label="Project"><input type="number" min="0" max="100" step="0.01" class="form-control form-control-sm" name="student_marks[${index}][project_score]" value="${escapeHtml(existing.project_score !== null && existing.project_score !== undefined ? existing.project_score : '')}"></td>`;
-                }
-                body += '</tr>';
-            });
+                    const maxExamWeight = currentSetting.exam_weight || '100';
+                    const examLabel = labelWithMax(currentSetting.exam_label || 'Exam', maxExamWeight).text;
+                    body += `<td data-label="${examLabel}"><input type="number" min="0" max="${escapeHtml(maxExamWeight)}" step="0.01" class="form-control form-control-sm" name="student_marks[${index}][exam_score]" value="${escapeHtml(existing.exam_score !== null && existing.exam_score !== undefined ? existing.exam_score : '')}"></td>`;
+                    if (currentSetting.project_enabled) {
+                        body += `<td data-label="Project"><input type="number" min="0" max="100" step="0.01" class="form-control form-control-sm" name="student_marks[${index}][project_score]" value="${escapeHtml(existing.project_score !== null && existing.project_score !== undefined ? existing.project_score : '')}"></td>`;
+                    }
+                    body += '</tr>';
+                });
+            } else {
+                body = '<tr><td colspan="100%" class="text-center py-4 text-warning font-weight-bold"><i class="fa fa-info-circle"></i> No students are registered / enrolled in this class for the selected session.</td></tr>';
+            }
 
             $('#marks-body').html(body);
             $('#marks-panel').removeClass('d-none');
             return response;
+        }).always(function () {
+            $btn.prop('disabled', false).html(originalHtml);
         });
     }
 
     $(document).on('click', '#load-context', function () {
         loadMarksContext().fail(function (xhr) {
-            const errorData = xhr.responseJSON || {};
-            alert(errorData.message || 'Unable to load class marking context.');
+            const errorData = xhr ? (xhr.responseJSON || {}) : {};
+            if (errorData.message) {
+                alert(errorData.message);
+            }
         });
     });
 
@@ -358,13 +405,14 @@
         const sectionId = $('#section_id').val() || '';
         const subjectId = $('#subject_id').val();
         const term = $('#term').val();
+        const yearId = $('#year_id').val();
 
-        if (!classId || !subjectId || !term) {
+        if (!yearId || !classId || !subjectId || !term) {
             alert('Please select Session, Class, Term, and Subject first before exporting Excel.');
             return;
         }
 
-        const url = "{{ route('academic.marks.export') }}?class_id=" + classId + "&section_id=" + sectionId + "&subject_id=" + subjectId + "&term=" + encodeURIComponent(term);
+        const url = "{{ route('academic.marks.export') }}?year_id=" + yearId + "&class_id=" + classId + "&section_id=" + sectionId + "&subject_id=" + subjectId + "&term=" + encodeURIComponent(term);
         window.location.href = url;
     });
 
@@ -373,8 +421,9 @@
         const classId = $('#class_id').val();
         const subjectId = $('#subject_id').val();
         const term = $('#term').val();
+        const yearId = $('#year_id').val();
 
-        if (!classId || !subjectId || !term) {
+        if (!yearId || !classId || !subjectId || !term) {
             alert('Please select Session, Class, Term, and Subject first before importing Excel.');
             return;
         }
@@ -392,10 +441,12 @@
         const sectionId = $('#section_id').val() || '';
         const subjectId = $('#subject_id').val();
         const term = $('#term').val();
+        const yearId = $('#year_id').val();
 
         const formData = new FormData();
         formData.append('_token', '{{ csrf_token() }}');
         formData.append('excel_file', file);
+        formData.append('year_id', yearId);
         formData.append('class_id', classId);
         formData.append('section_id', sectionId);
         formData.append('subject_id', subjectId);
@@ -565,4 +616,4 @@
         });
     });
 </script>
-@endsection
+@endpush

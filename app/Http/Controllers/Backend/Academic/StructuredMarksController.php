@@ -19,6 +19,7 @@ use App\Models\StudentSection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
@@ -42,8 +43,27 @@ class StructuredMarksController extends Controller
             ->orderBy('name')
             ->get();
 
+        if ($user->hasRole('Admin', 'Super Admin') || in_array($user->role, ['Admin', 'Super Admin'])) {
+            $classes = StudentClass::query()->orderBy('name')->get();
+        } else {
+            $classIds = TeacherAssignment::query()
+                ->where('teacher_id', $user->id)
+                ->pluck('class_id')
+                ->unique()
+                ->values();
+
+            $classes = StudentClass::query()
+                ->whereIn('id', $classIds)
+                ->orderBy('name')
+                ->get();
+        }
+
+        $subjects = SchoolSubject::query()->orderBy('name')->get();
+
         return view('backend.academic.marks.entry', [
             'sections' => $sections,
+            'classes' => $classes,
+            'subjects' => $subjects,
             'years' => $years,
             'currentSession' => getCurrentSession(),
         ]);
@@ -53,13 +73,17 @@ class StructuredMarksController extends Controller
     {
         $request->validate([
             'section_id' => 'nullable|exists:school_sections,id',
+            'year_id' => 'nullable|exists:student_years,id',
         ]);
 
         $user = Auth::user();
-        if ($user->hasRole('Admin') || $user->role === 'Admin') {
+        $sessionId = $this->resolveSessionId($request);
+
+        if ($user->hasRole('Admin', 'Super Admin') || in_array($user->role, ['Admin', 'Super Admin'])) {
             $query = StudentClass::query();
             if ($request->section_id) {
-                $query->where('section_id', $request->section_id);
+                $classIds = $this->classIdsForSection((int) $request->section_id, $sessionId);
+                $query->whereIn('id', $classIds);
             }
             $classes = $query->orderBy('name')->get();
         } else {
@@ -77,17 +101,40 @@ class StructuredMarksController extends Controller
                 ->unique()
                 ->values();
 
-            $classes = StudentClass::query()
-                ->whereIn('id', $classIds);
-            
             if ($request->section_id) {
-                $classes->where('section_id', $request->section_id);
+                $sectionClassIds = $this->classIdsForSection((int) $request->section_id, $sessionId);
+                $classIds = $classIds->intersect($sectionClassIds)->values();
             }
 
-            $classes = $classes->orderBy('name')->get();
+            $classes = StudentClass::query()
+                ->whereIn('id', $classIds)
+                ->orderBy('name')
+                ->get();
         }
 
         return response()->json($classes);
+    }
+
+    private function resolveSessionId(Request $request): ?int
+    {
+        return (int) ($request->input('year_id') ?: optional(getCurrentSession())->id) ?: null;
+    }
+
+    private function classIdsForSection(int $sectionId, ?int $sessionId = null): Collection
+    {
+        $directClassIds = StudentClass::query()
+            ->where('section_id', $sectionId)
+            ->pluck('id');
+
+        $enrolledClassIds = StudentSection::query()
+            ->where('section_id', $sectionId)
+            ->when($sessionId, fn ($query) => $query->where('year_id', $sessionId))
+            ->pluck('class_id');
+
+        return $directClassIds
+            ->merge($enrolledClassIds)
+            ->unique()
+            ->values();
     }
 
     public function getSectionsByClass(Request $request)
@@ -97,7 +144,7 @@ class StructuredMarksController extends Controller
         ]);
 
         $user = Auth::user();
-        if ($user->hasRole('Admin') || $user->role === 'Admin') {
+        if ($user->hasRole('Admin', 'Super Admin') || in_array($user->role, ['Admin', 'Super Admin'])) {
             $query = SchoolSection::query();
             if ($request->class_id) {
                 $query->whereHas('classes', function($q) use ($request) {
@@ -132,38 +179,126 @@ class StructuredMarksController extends Controller
             abort(403, 'Unauthorized access to Academic Management');
         }
 
-        $subjects = SchoolSubject::query()
-            ->whereIn('id', function($q) use ($request, $user) {
-                $q->select('subject_id')
-                  ->from('assign_subjects')
-                  ->where('class_id', $request->class_id);
-                
-                if ($request->section_id) {
-                    $q->where(function($sq) use ($request) {
-                        $sq->where('section_id', $request->section_id)
-                           ->orWhereNull('section_id');
-                    });
-                }
-                
-                if (!$user->hasRole('Admin') && $user->role !== 'Admin') {
-                    $q->whereIn('subject_id', function ($teacherSubjectQuery) use ($request, $user) {
-                        $teacherSubjectQuery->select('subject_id')
-                            ->from('teacher_assignments')
-                            ->where('teacher_id', $user->id)
-                            ->where('class_id', $request->class_id);
+        $isAdmin = $user->hasRole('Admin', 'Super Admin') || in_array($user->role, ['Admin', 'Super Admin']);
+
+        if ($isAdmin) {
+            $assignedQuery = SchoolSubject::query()
+                ->whereIn('id', function($q) use ($request) {
+                    $q->select('subject_id')
+                      ->from('assign_subjects')
+                      ->where('class_id', $request->class_id);
+
+                    if ($request->section_id) {
+                        $q->where(function($sq) use ($request) {
+                            $sq->where('section_id', $request->section_id)
+                               ->orWhereNull('section_id');
+                        });
+                    }
+                });
+
+            $subjects = $assignedQuery->orderBy('name')->get();
+
+            if ($subjects->isEmpty()) {
+                $subjects = SchoolSubject::query()->orderBy('name')->get();
+            }
+        } else {
+            $subjects = SchoolSubject::query()
+                ->whereIn('id', function($q) use ($request, $user) {
+                    $q->select('subject_id')
+                      ->from('teacher_assignments')
+                      ->where('teacher_id', $user->id)
+                      ->where('class_id', $request->class_id);
+
+                    if ($request->section_id) {
+                        $q->where(function($sq) use ($request) {
+                            $sq->where('section_id', $request->section_id)
+                               ->orWhereNull('section_id');
+                        });
+                    }
+                })
+                ->orderBy('name')
+                ->get();
+
+            if ($subjects->isEmpty()) {
+                $subjects = SchoolSubject::query()
+                    ->whereIn('id', function($q) use ($request) {
+                        $q->select('subject_id')
+                          ->from('assign_subjects')
+                          ->where('class_id', $request->class_id);
 
                         if ($request->section_id) {
-                            $teacherSubjectQuery->where(function ($sectionQuery) use ($request) {
-                                $sectionQuery->where('section_id', $request->section_id)
-                                    ->orWhereNull('section_id');
+                            $q->where(function($sq) use ($request) {
+                                $sq->where('section_id', $request->section_id)
+                                   ->orWhereNull('section_id');
                             });
                         }
-                    });
-                }
-            })
-            ->get();
+                    })
+                    ->orderBy('name')
+                    ->get();
+            }
+
+            if ($subjects->isEmpty()) {
+                $subjects = SchoolSubject::query()->orderBy('name')->get();
+            }
+        }
 
         return response()->json($subjects);
+    }
+
+    private function resolveMarkingSetting($classId, $sectionId = null, $subjectId = null, $term = null, $sessionId = null)
+    {
+        $setting = ClassMarkingSetting::query()
+            ->where('class_id', $classId)
+            ->where(function ($query) use ($sectionId) {
+                $query->whereNull('section_id')
+                    ->orWhere('section_id', $sectionId);
+            })
+            ->where(function ($query) use ($subjectId) {
+                $query->whereNull('subject_id')
+                    ->orWhere('subject_id', $subjectId);
+            })
+            ->where(function ($query) use ($sessionId) {
+                $query->whereNull('session_id')
+                    ->orWhere('session_id', $sessionId);
+            })
+            ->where(function ($query) use ($term) {
+                $query->whereNull('term')
+                    ->orWhere('term', $term);
+            })
+            ->where('is_active', true)
+            ->orderByDesc('term')
+            ->orderByDesc('subject_id')
+            ->orderByDesc('section_id')
+            ->orderByDesc('session_id')
+            ->first();
+
+        if (!$setting) {
+            $setting = ClassMarkingSetting::query()
+                ->where('class_id', $classId)
+                ->where('is_active', true)
+                ->first();
+        }
+
+        if (!$setting) {
+            $setting = new ClassMarkingSetting([
+                'class_id' => $classId,
+                'section_id' => $sectionId,
+                'subject_id' => $subjectId,
+                'session_id' => $sessionId,
+                'term' => $term,
+                'ca_count' => 2,
+                'ca_labels' => ['1st CA', '2nd CA'],
+                'ca_weights' => [20, 20],
+                'ca_weight' => 40.00,
+                'exam_weight' => 60.00,
+                'exam_label' => 'Exam',
+                'project_enabled' => false,
+                'total_score' => 100.00,
+                'is_active' => true,
+            ]);
+        }
+
+        return $setting;
     }
 
     public function getTerms(Request $request)
@@ -178,6 +313,7 @@ class StructuredMarksController extends Controller
     public function loadEntryContext(Request $request)
     {
         $validated = $request->validate([
+            'year_id' => 'nullable|exists:student_years,id',
             'class_id' => 'required|exists:student_classes,id',
             'section_id' => 'nullable|exists:school_sections,id',
             'subject_id' => 'required|exists:school_subjects,id',
@@ -188,70 +324,75 @@ class StructuredMarksController extends Controller
         if ($user->hasRole('Parent')) {
             abort(403, 'Unauthorized access to Academic Management');
         }
-        if (!$user->hasRole('Admin', 'Super Admin')) {
-            $assignmentQuery = TeacherAssignment::query()
+        if (!$user->hasRole('Admin', 'Super Admin') && !in_array($user->role, ['Admin', 'Super Admin'])) {
+            $isSubjectTeacher = TeacherAssignment::query()
                 ->where('teacher_id', $user->id)
                 ->where('class_id', $validated['class_id'])
-                ->where('subject_id', $validated['subject_id']);
+                ->where('subject_id', $validated['subject_id'])
+                ->when($validated['section_id'] ?? null, function ($q, $sec) {
+                    $q->where(function ($sq) use ($sec) {
+                        $sq->where('section_id', $sec)->orWhereNull('section_id');
+                    });
+                })
+                ->exists();
 
-            if ($validated['section_id']) {
-                $assignmentQuery->where(function($q) use ($validated) {
-                    $q->where('section_id', $validated['section_id'])
-                      ->orWhereNull('section_id');
-                });
-            }
+            $isClassTeacher = AssignClassTeacher::query()
+                ->where('teacher_id', $user->id)
+                ->where('class_id', $validated['class_id'])
+                ->when($validated['section_id'] ?? null, function ($q, $sec) {
+                    $q->where(function ($sq) use ($sec) {
+                        $sq->where('section_id', $sec)->orWhereNull('section_id');
+                    });
+                })
+                ->exists();
 
-            $exists = $assignmentQuery->exists();
-            \Log::info("Teacher Assignment Check - User: " . $user->id . " | Class: " . $validated['class_id'] . " | Subject: " . $validated['subject_id'] . " | Section: " . ($validated['section_id'] ?? 'NULL') . " | Exists: " . ($exists ? 'YES' : 'NO'));
+            $isAssignSubject = AssignSubject::query()
+                ->where('class_id', $validated['class_id'])
+                ->where('subject_id', $validated['subject_id'])
+                ->where('teacher_id', $user->id)
+                ->exists();
 
-            abort_unless($exists, 403, 'Unauthorized class/subject assignment.');
+            abort_unless($isSubjectTeacher || $isClassTeacher || $isAssignSubject, 403, 'Unauthorized class/subject assignment.');
         }
 
-        $session = getCurrentSession();
+        $session = StudentYear::query()->find($this->resolveSessionId($request));
 
-        $setting = ClassMarkingSetting::query()
-            ->where('class_id', $validated['class_id'])
-            ->where(function ($query) use ($validated) {
-                $query->whereNull('section_id')
-                    ->orWhere('section_id', $validated['section_id']);
-            })
-            ->where(function ($query) use ($validated) {
-                $query->whereNull('subject_id')
-                    ->orWhere('subject_id', $validated['subject_id']);
-            })
-            ->where(function ($query) use ($session) {
-                $query->whereNull('session_id')
-                    ->orWhere('session_id', optional($session)->id);
-            })
-            ->where(function ($query) use ($request) {
-                $query->whereNull('term')
-                    ->orWhere('term', $request->term);
-            })
-            ->where('is_active', true)
-            ->orderByDesc('term')
-            ->orderByDesc('subject_id')
-            ->orderByDesc('section_id')
-            ->orderByDesc('session_id')
-            ->first();
-
-        if (!$setting) {
-            return response()->json([
-                'message' => 'No class marking setting found for this class/subject.',
-            ], 422);
-        }
+        $setting = $this->resolveMarkingSetting(
+            $validated['class_id'],
+            $validated['section_id'] ?? null,
+            $validated['subject_id'],
+            $validated['term'],
+            optional($session)->id
+        );
 
         $studentQuery = AssignStudent::query()
             ->with('student')
-            ->where('year_id', optional($session)->id)
+            ->whereHas('student')
             ->where('class_id', $validated['class_id']);
 
-        if ($validated['section_id']) {
+        if (optional($session)->id) {
+            $studentQuery->where('year_id', optional($session)->id);
+        }
+
+        if (!empty($validated['section_id'])) {
             $studentIds = StudentSection::where('section_id', $validated['section_id'])
+                ->where('class_id', $validated['class_id'])
+                ->when(optional($session)->id, fn ($query, $sessionId) => $query->where('year_id', $sessionId))
+                ->where('is_active', true)
                 ->pluck('student_id');
+
             $studentQuery->whereIn('student_id', $studentIds);
         }
 
         $students = $studentQuery->get();
+
+        if ($students->isEmpty()) {
+            $students = AssignStudent::query()
+                ->with('student')
+                ->whereHas('student')
+                ->where('class_id', $validated['class_id'])
+                ->get();
+        }
 
         $existingQuery = StudentMarks::query()
             ->where('class_id', $validated['class_id'])
@@ -259,7 +400,7 @@ class StructuredMarksController extends Controller
             ->where('session_id', optional($session)->id)
             ->where('term', $validated['term']);
 
-        if ($validated['section_id']) {
+        if (!empty($validated['section_id'])) {
             $existingQuery->where('section_id', $validated['section_id']);
         }
 
@@ -284,9 +425,10 @@ class StructuredMarksController extends Controller
 
     public function store(Request $request)
     {
-        $session = getCurrentSession();
+        $session = StudentYear::query()->find($this->resolveSessionId($request));
 
         $validated = $request->validate([
+            'year_id' => 'nullable|exists:student_years,id',
             'class_id' => 'required|exists:student_classes,id',
             'section_id' => 'nullable|exists:school_sections,id',
             'subject_id' => 'required|exists:school_subjects,id',
@@ -301,53 +443,57 @@ class StructuredMarksController extends Controller
         ]);
 
         $user = Auth::user();
-        if (!$user->hasRole('Admin', 'Super Admin')) {
-            $assignmentQuery = TeacherAssignment::query()
+        if (!$user->hasRole('Admin', 'Super Admin') && !in_array($user->role, ['Admin', 'Super Admin'])) {
+            $isSubjectTeacher = TeacherAssignment::query()
                 ->where('teacher_id', $user->id)
                 ->where('class_id', $validated['class_id'])
-                ->where('subject_id', $validated['subject_id']);
+                ->where('subject_id', $validated['subject_id'])
+                ->when($validated['section_id'] ?? null, function ($q, $sec) {
+                    $q->where(function ($sq) use ($sec) {
+                        $sq->where('section_id', $sec)->orWhereNull('section_id');
+                    });
+                })
+                ->exists();
 
-            if ($validated['section_id']) {
-                $assignmentQuery->where(function($q) use ($validated) {
-                    $q->where('section_id', $validated['section_id'])
-                      ->orWhereNull('section_id');
-                });
-            }
+            $isClassTeacher = AssignClassTeacher::query()
+                ->where('teacher_id', $user->id)
+                ->where('class_id', $validated['class_id'])
+                ->when($validated['section_id'] ?? null, function ($q, $sec) {
+                    $q->where(function ($sq) use ($sec) {
+                        $sq->where('section_id', $sec)->orWhereNull('section_id');
+                    });
+                })
+                ->exists();
 
-            abort_unless($assignmentQuery->exists(), 403, 'Unauthorized class/subject assignment.');
+            $isAssignSubject = AssignSubject::query()
+                ->where('class_id', $validated['class_id'])
+                ->where('subject_id', $validated['subject_id'])
+                ->where('teacher_id', $user->id)
+                ->exists();
+
+            abort_unless($isSubjectTeacher || $isClassTeacher || $isAssignSubject, 403, 'Unauthorized class/subject assignment.');
         }
 
-        $setting = ClassMarkingSetting::query()
-            ->where('class_id', $validated['class_id'])
-            ->where(function ($query) use ($validated) {
-                $query->whereNull('section_id')
-                    ->orWhere('section_id', $validated['section_id']);
-            })
-            ->where(function ($query) use ($validated) {
-                $query->whereNull('subject_id')
-                    ->orWhere('subject_id', $validated['subject_id']);
-            })
-            ->where(function ($query) use ($session) {
-                $query->whereNull('session_id')
-                    ->orWhere('session_id', optional($session)->id);
-            })
-            ->where(function ($query) use ($validated) {
-                $query->whereNull('term')
-                    ->orWhere('term', $validated['term']);
-            })
-            ->where('is_active', true)
-            ->orderByDesc('term')
-            ->orderByDesc('subject_id')
-            ->orderByDesc('section_id')
-            ->orderByDesc('session_id')
-            ->firstOrFail();
+        $setting = $this->resolveMarkingSetting(
+            $validated['class_id'],
+            $validated['section_id'] ?? null,
+            $validated['subject_id'],
+            $validated['term'],
+            optional($session)->id
+        );
 
         $validStudentQuery = AssignStudent::query()
-            ->where('year_id', optional($session)->id)
             ->where('class_id', $validated['class_id']);
+
+        if (optional($session)->id) {
+            $validStudentQuery->where('year_id', optional($session)->id);
+        }
 
         if ($validated['section_id']) {
             $studentIds = StudentSection::where('section_id', $validated['section_id'])
+                ->where('class_id', $validated['class_id'])
+                ->when(optional($session)->id, fn ($query, $sessionId) => $query->where('year_id', $sessionId))
+                ->where('is_active', true)
                 ->pluck('student_id');
             $validStudentQuery->whereIn('student_id', $studentIds);
         }
@@ -545,46 +691,40 @@ class StructuredMarksController extends Controller
     public function exportExcel(Request $request)
     {
         $validated = $request->validate([
+            'year_id' => 'nullable|exists:student_years,id',
             'class_id' => 'required|exists:student_classes,id',
             'section_id' => 'nullable|exists:school_sections,id',
             'subject_id' => 'required|exists:school_subjects,id',
             'term' => ['required', Rule::in(['1st Term', '2nd Term', '3rd Term'])],
         ]);
 
-        $session = getCurrentSession();
+        $session = StudentYear::query()->find($this->resolveSessionId($request));
         $class = StudentClass::find($validated['class_id']);
         $subject = SchoolSubject::find($validated['subject_id']);
 
-        $setting = ClassMarkingSetting::query()
-            ->where('class_id', $validated['class_id'])
-            ->where(function ($query) use ($validated) {
-                $query->whereNull('section_id')->orWhere('section_id', $validated['section_id']);
-            })
-            ->where(function ($query) use ($validated) {
-                $query->whereNull('subject_id')->orWhere('subject_id', $validated['subject_id']);
-            })
-            ->where(function ($query) use ($session) {
-                $query->whereNull('session_id')->orWhere('session_id', optional($session)->id);
-            })
-            ->where(function ($query) use ($validated) {
-                $query->whereNull('term')->orWhere('term', $validated['term']);
-            })
-            ->where('is_active', true)
-            ->orderByDesc('term')
-            ->first();
-
-        if (!$setting) {
-            return back()->with('error', 'No class marking setting found for this class/subject.');
-        }
+        $setting = $this->resolveMarkingSetting(
+            $validated['class_id'],
+            $validated['section_id'] ?? null,
+            $validated['subject_id'],
+            $validated['term'],
+            optional($session)->id
+        );
 
         $studentQuery = AssignStudent::query()
             ->with('student')
             ->whereHas('student')
-            ->where('year_id', optional($session)->id)
             ->where('class_id', $validated['class_id']);
 
+        if (optional($session)->id) {
+            $studentQuery->where('year_id', optional($session)->id);
+        }
+
         if (!empty($validated['section_id'])) {
-            $studentIds = StudentSection::where('section_id', $validated['section_id'])->pluck('student_id');
+            $studentIds = StudentSection::where('section_id', $validated['section_id'])
+                ->where('class_id', $validated['class_id'])
+                ->when(optional($session)->id, fn ($query, $sessionId) => $query->where('year_id', $sessionId))
+                ->where('is_active', true)
+                ->pluck('student_id');
             $studentQuery->whereIn('student_id', $studentIds);
         }
 
@@ -683,33 +823,22 @@ class StructuredMarksController extends Controller
     {
         $request->validate([
             'excel_file' => 'required|file|mimes:csv,txt,xlsx,xls|max:5120',
+            'year_id' => 'nullable|exists:student_years,id',
             'class_id' => 'required|exists:student_classes,id',
+            'section_id' => 'nullable|exists:school_sections,id',
             'subject_id' => 'required|exists:school_subjects,id',
             'term' => ['required', Rule::in(['1st Term', '2nd Term', '3rd Term'])],
         ]);
 
-        $session = getCurrentSession();
+        $session = StudentYear::query()->find($this->resolveSessionId($request));
 
-        $setting = ClassMarkingSetting::query()
-            ->where('class_id', $request->class_id)
-            ->where(function ($query) use ($request) {
-                $query->whereNull('section_id')->orWhere('section_id', $request->section_id);
-            })
-            ->where(function ($query) use ($request) {
-                $query->whereNull('subject_id')->orWhere('subject_id', $request->subject_id);
-            })
-            ->where(function ($query) use ($session) {
-                $query->whereNull('session_id')->orWhere('session_id', optional($session)->id);
-            })
-            ->where(function ($query) use ($request) {
-                $query->whereNull('term')->orWhere('term', $request->term);
-            })
-            ->where('is_active', true)
-            ->orderByDesc('term')
-            ->orderByDesc('subject_id')
-            ->orderByDesc('section_id')
-            ->orderByDesc('session_id')
-            ->first();
+        $setting = $this->resolveMarkingSetting(
+            $request->class_id,
+            $request->section_id ?? null,
+            $request->subject_id,
+            $request->term,
+            optional($session)->id
+        );
 
         $file = $request->file('excel_file');
         $path = $file->getRealPath();
