@@ -344,6 +344,9 @@ Route::get('assign/subject/details/{class_id}/{section_id?}', [AssignSubjectCont
 
 Route::get('assign/subject/delete/{id}', [AssignSubjectController::class, 'DeleteAssignSubject'])->name('assign.subject.delete');
 
+Route::get('assign/subject/delete-group/{class_id}/{section_id?}', [AssignSubjectController::class, 'DeleteAssignSubjectGroup'])->name('assign.subject.delete.group');
+
+
 // Assign Class Teacher Routes 
 Route::get('assign/class/teacher/view', [AssignClassTeacherController::class, 'ViewAssignTeacher'])->name('assign.class.teacher.view');
 Route::get('assign/class/teacher/add', [AssignClassTeacherController::class, 'AddAssignTeacher'])->name('assign.class.teacher.add');

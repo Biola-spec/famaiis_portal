@@ -175,6 +175,29 @@ public function UpdateAssignSubject(Request $request,$class_id){
         return redirect()->route('assign.subject.view')->with($notification);
     }
 
+    public function DeleteAssignSubjectGroup($class_id, $section_id = null){
+        $query = AssignSubject::where('class_id', $class_id);
+        $teacherQuery = TeacherAssignment::where('class_id', $class_id);
+
+        if ($section_id) {
+            $query->where('section_id', $section_id);
+            $teacherQuery->where('section_id', $section_id);
+        } else {
+            $query->whereNull('section_id');
+            $teacherQuery->whereNull('section_id');
+        }
+
+        $teacherQuery->delete();
+        $query->delete();
+
+        $notification = array(
+            'message' => 'Subject assignment group deleted successfully',
+            'alert-type' => 'success'
+        );
+
+        return redirect()->route('assign.subject.view')->with($notification);
+    }
+
     private function teacherQuery()
     {
         return User::where(function ($query) {

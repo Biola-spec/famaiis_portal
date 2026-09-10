@@ -35,10 +35,11 @@
 			<tr>
 				<th width="5%">SL</th>  
 				<th width="20%">Subject</th> 
-				<th width="20%">Full Mark</th>
-				<th width="20%">Pass Mark</th>
-				<th width="20%">Subjective Mark</th>
+				<th width="15%">Full Mark</th>
+				<th width="15%">Pass Mark</th>
+				<th width="15%">Subjective Mark</th>
 				<th width="20%">Teacher</th>
+				<th width="10%">Action</th>
 			</tr>
 		</thead>
 		<tbody>
@@ -55,6 +56,9 @@
 					@else
 						{{ $detail['teacher']['name'] ?? 'Not Assigned' }}
 					@endif
+				</td>
+				<td>
+					<a href="{{ route('assign.subject.delete', $detail->id) }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this subject assignment?');">Delete</a>
 				</td>
 			</tr>
 			@endforeach
@@ -80,9 +84,5 @@
 	  
 	  </div>
   </div>
-
-
-
-
 
 @endsection

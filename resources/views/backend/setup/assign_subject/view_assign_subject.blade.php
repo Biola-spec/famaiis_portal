@@ -43,6 +43,8 @@
 				<td>
 <a href="{{ route('assign.subject.edit', ['class_id' => $assign->class_id, 'section_id' => $assign->section_id] ) }}" class="btn btn-info">Edit</a>
 <a href="{{ route('assign.subject.details', ['class_id' => $assign->class_id, 'section_id' => $assign->section_id] ) }}" class="btn btn-primary" >Details</a>
+<a href="{{ route('assign.subject.delete.group', ['class_id' => $assign->class_id, 'section_id' => $assign->section_id] ) }}" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete all subject assignments for this class and section?');">Delete</a>
+
 
 				</td>
 				 
