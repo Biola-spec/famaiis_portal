@@ -40,12 +40,10 @@
 				<td>{{ $key+1 }}</td>
 				<td> {{ $assign['student_class']['name'] ?? 'N/A' }}</td>
                 <td> {{ $assign->section->name ?? 'All Sections' }}</td>				 
-				<td>
-<a href="{{ route('assign.subject.edit', ['class_id' => $assign->class_id, 'section_id' => $assign->section_id] ) }}" class="btn btn-info">Edit</a>
-<a href="{{ route('assign.subject.details', ['class_id' => $assign->class_id, 'section_id' => $assign->section_id] ) }}" class="btn btn-primary" >Details</a>
-<a href="{{ route('assign.subject.delete.group', ['class_id' => $assign->class_id, 'section_id' => $assign->section_id] ) }}" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete all subject assignments for this class and section?');">Delete</a>
-
-
+				<td class="text-nowrap">
+					<a href="{{ route('assign.subject.edit', ['class_id' => $assign->class_id, 'section_id' => $assign->section_id] ) }}" class="btn btn-sm btn-info">Edit</a>
+					<a href="{{ route('assign.subject.details', ['class_id' => $assign->class_id, 'section_id' => $assign->section_id] ) }}" class="btn btn-sm btn-primary">Details</a>
+					<a href="{{ route('assign.subject.delete.group', ['class_id' => $assign->class_id, 'section_id' => $assign->section_id] ) }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete all subject assignments for this class and section?');">Delete</a>
 				</td>
 				 
 			</tr>
@@ -99,7 +97,7 @@
 				<td>{{ $assignment->full_mark }}</td>
 				<td>{{ $assignment->pass_mark }}</td>
 				<td>{{ $assignment->subjective_mark }}</td>
-				<td>
+				<td class="text-nowrap">
 					<a href="{{ route('assign.subject.edit', ['class_id' => $assignment->class_id, 'section_id' => $assignment->section_id]) }}" class="btn btn-sm btn-info">Edit</a>
 					@if($assignment->teacher_id)
 					<a href="{{ route('assign.subject.teacher.pdf', $assignment->teacher_id) }}" target="_blank" class="btn btn-sm btn-warning" title="Download Teacher PDF"><i class="fa fa-file-pdf-o"></i> PDF</a>
