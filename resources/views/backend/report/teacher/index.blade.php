@@ -48,11 +48,9 @@
                                                 @if($report->media->where('file_type', 'document')->count() > 0) <i class="fa fa-file-text text-warning"></i> @endif
                                             </td>
                                             <td>
-                                                @php
-                                                    $seenCount = $report->students->whereNotNull('pivot.seen_at')->count();
-                                                    $totalCount = $report->students->count();
-                                                @endphp
-                                                <span class="badge badge-pill badge-primary">{{ $seenCount }} / {{ $totalCount }}</span>
+                                                <span class="badge badge-pill badge-primary">
+                                                    {{ $report->students->whereNotNull('pivot.seen_at')->count() }} / {{ $report->students->count() }}
+                                                </span>
                                             </td>
                                             <td>
                                                 <a href="#" class="btn btn-info btn-sm" title="View"><i class="fa fa-eye"></i></a>
