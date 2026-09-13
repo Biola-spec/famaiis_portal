@@ -8,6 +8,8 @@ use App\Models\Report;
 use App\Models\ReportMedia;
 use App\Models\SchoolSubject;
 use App\Models\StudentClass;
+use App\Models\StudentSection;
+use App\Models\StudentYear;
 use App\Models\TeacherAssignment;
 use App\Models\User;
 use App\Notifications\ReportNotification;
@@ -65,28 +67,11 @@ class ReportController extends Controller
 
     public function getTeacherStudents(Request $request)
     {
-        $activeYear = getCurrentSession() ?? StudentYear::where('is_active', 1)->first() ?? StudentYear::first();
+        $request->validate([
+            'class_id' => 'required|integer',
+        ]);
 
-        $query = AssignStudent::with('student')
-            ->whereHas('student')
-            ->where('class_id', $request->class_id);
-
-        if ($activeYear) {
-            $query->where('year_id', $activeYear->id);
-        }
-
-        $assignStudents = $query->get();
-
-        if ($assignStudents->isEmpty()) {
-            $assignStudents = AssignStudent::with('student')
-                ->whereHas('student')
-                ->where('class_id', $request->class_id)
-                ->get();
-        }
-
-        $students = $assignStudents->pluck('student')->filter()->values();
-
-        return response()->json($students);
+        return response()->json($this->getClassStudents($request->integer('class_id'))->values());
     }
 
     public function teacherStore(Request $request)
@@ -122,16 +107,9 @@ class ReportController extends Controller
 
             // Link Students
             if ($report->is_for_all) {
-                $activeYear = getCurrentSession() ?? StudentYear::where('is_active', 1)->first() ?? StudentYear::first();
-                $query = AssignStudent::whereHas('student')->where('class_id', $request->class_id);
-                if ($activeYear) {
-                    $query->where('year_id', $activeYear->id);
-                }
-                $studentIds = $query->pluck('student_id')->toArray();
-                if (empty($studentIds)) {
-                    $studentIds = AssignStudent::whereHas('student')->where('class_id', $request->class_id)->pluck('student_id')->toArray();
-                }
-                $report->students()->attach($studentIds);
+                $report->students()->attach(
+                    $this->getClassStudents((int) $request->class_id)->pluck('id')->all()
+                );
             } else {
                 $report->students()->attach($request->student_ids);
             }
@@ -179,7 +157,96 @@ class ReportController extends Controller
             $teacher->notify(new ReportNotification(array_merge($notificationData, ['title' => 'Report Published: ' . $report->title, 'message' => 'Your report has been successfully published.'])));
         });
 
-        return redirect()->route('teacher.report.index')->with('success', 'Report created successfully.');
+        return redirect()->route('teacher.report.index')->with([
+            'message' => 'Report created successfully.',
+            'alert-type' => 'success',
+        ]);
+    }
+
+    private function getClassStudents(int $classId)
+    {
+        $activeYear = getCurrentSession() ?? StudentYear::where('is_active', 1)->first() ?? StudentYear::first();
+        $yearId = $activeYear?->id;
+
+        $students = collect();
+
+        $assignQuery = AssignStudent::with('student')
+            ->whereHas('student')
+            ->where('class_id', $classId);
+
+        if ($yearId) {
+            $assignQuery->where('year_id', $yearId);
+        }
+
+        $this->addStudentsToCollection($students, $assignQuery->get()->pluck('student'));
+
+        $sectionQuery = StudentSection::with('student')
+            ->whereHas('student')
+            ->where('class_id', $classId)
+            ->where('is_active', true);
+
+        if ($yearId) {
+            $sectionQuery->where('year_id', $yearId);
+        }
+
+        $this->addStudentsToCollection($students, $sectionQuery->get()->pluck('student'));
+
+        if ($students->isEmpty()) {
+            $this->addStudentsToCollection(
+                $students,
+                AssignStudent::with('student')
+                    ->whereHas('student')
+                    ->where('class_id', $classId)
+                    ->get()
+                    ->pluck('student')
+            );
+
+            $this->addStudentsToCollection(
+                $students,
+                StudentSection::with('student')
+                    ->whereHas('student')
+                    ->where('class_id', $classId)
+                    ->get()
+                    ->pluck('student')
+            );
+        }
+
+        return $students->sortBy('name')->values();
+    }
+
+    private function addStudentsToCollection($students, $studentRecords): void
+    {
+        foreach ($studentRecords as $student) {
+            if (!$student || $students->has($student->id)) {
+                continue;
+            }
+
+            $name = $student->name;
+            if (empty($name)) {
+                $name = trim(implode(' ', array_filter([
+                    $student->first_name ?? null,
+                    $student->surname ?? null,
+                    $student->middle_name ?? null,
+                ])));
+            }
+            if (empty($name)) {
+                $name = trim(implode(' ', array_filter([
+                    $student->fname ?? null,
+                    $student->surname ?? null,
+                    $student->mname ?? null,
+                ])));
+            }
+            if (empty($name)) {
+                $name = $student->email ?? ('Student #' . $student->id);
+            }
+
+            $students->put($student->id, [
+                'id' => $student->id,
+                'student_id' => $student->id,
+                'name' => $name,
+                'id_no' => $student->id_no ?? '',
+            ]);
+        }
     }
 
     // --- Parent Actions ---
@@ -256,6 +323,9 @@ class ReportController extends Controller
 
         $report->delete();
 
-        return redirect()->back()->with('success', 'Report deleted successfully.');
+        return redirect()->back()->with([
+            'message' => 'Report deleted successfully.',
+            'alert-type' => 'success',
+        ]);
     }
 }

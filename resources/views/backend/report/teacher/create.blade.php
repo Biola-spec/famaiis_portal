@@ -11,7 +11,30 @@
                             <h3 class="box-title">Create New Report / Activity</h3>
                         </div>
                         <div class="box-body">
-                            <form method="post" action="{{ route('teacher.report.store') }}" enctype="multipart/form-data">
+                            @if(session('message'))
+                                <div class="alert alert-{{ session('alert-type') === 'error' ? 'danger' : session('alert-type', 'info') }} alert-dismissible fade show" role="alert">
+                                    {{ session('message') }}
+                                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                        <span aria-hidden="true">&times;</span>
+                                    </button>
+                                </div>
+                            @endif
+
+                            @if($errors->any())
+                                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                    <strong>Please check the form:</strong>
+                                    <ul class="mb-0">
+                                        @foreach($errors->all() as $error)
+                                            <li>{{ $error }}</li>
+                                        @endforeach
+                                    </ul>
+                                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                        <span aria-hidden="true">&times;</span>
+                                    </button>
+                                </div>
+                            @endif
+
+                            <form id="activity-report-form" method="post" action="{{ route('teacher.report.store') }}" enctype="multipart/form-data">
                                 @csrf
                                 <div class="row">
                                     <div class="col-md-4">
@@ -70,7 +93,7 @@
                                         <div class="form-group">
                                             <h5>Description <span class="text-danger">*</span></h5>
                                             <div class="controls">
-                                                <textarea id="editor1" name="description" rows="10" cols="80" required></textarea>
+                                                <textarea id="editor1" name="description" rows="10" cols="80"></textarea>
                                             </div>
                                         </div>
                                     </div>
@@ -144,8 +167,11 @@
     </div>
 </div>
 
-<script src="{{ asset('assets/vendor_components/ckeditor/ckeditor.js') }}"></script>
 <link href="{{ asset('assets/vendor_components/select2/dist/css/select2.min.css') }}" rel="stylesheet" />
+@endsection
+
+@push('scripts')
+<script src="{{ asset('assets/vendor_components/ckeditor/ckeditor.js') }}"></script>
 <script src="{{ asset('assets/vendor_components/select2/dist/js/select2.full.min.js') }}"></script>
 
 <script>
@@ -162,15 +188,18 @@
         function fetchStudentsForClass(class_id) {
             if (!class_id) {
                 $('#student_ids').empty();
-                $('#student_ids').append('<option value="" disabled>Please select a Class first</option>');
+                $('#student_ids').append(new Option('Please select a Class first', '', false, false));
                 $('#student_ids').trigger('change');
                 return;
             }
+
+            $('#student_ids').empty().append(new Option('Loading students...', '', false, false)).trigger('change');
 
             $.ajax({
                 url: "{{ route('teacher.report.getStudents') }}",
                 type: "GET",
                 data: { class_id: class_id },
+                dataType: "json",
                 success: function(data) {
                     $('#student_ids').empty();
                     var count = 0;
@@ -181,22 +210,28 @@
                                 if (value.id_no) {
                                     label += ' (' + value.id_no + ')';
                                 }
-                                $('#student_ids').append('<option value="' + value.id + '">' + label + '</option>');
+                                $('#student_ids').append(new Option(label, value.id));
                                 count++;
                             }
                         });
                     }
                     
                     if (count === 0) {
-                        $('#student_ids').append('<option value="" disabled>No active students found in this class</option>');
+                        $('#student_ids').append(new Option('No active students found in this class', '', false, false));
                     }
 
                     $('#student_ids').trigger('change');
                 },
-                error: function() {
+                error: function(xhr) {
                     $('#student_ids').empty();
-                    $('#student_ids').append('<option value="" disabled>Error loading students</option>');
+                    $('#student_ids').append(new Option('Error loading students', '', false, false));
                     $('#student_ids').trigger('change');
+                    if (typeof toastr !== 'undefined') {
+                        var message = xhr.responseJSON && xhr.responseJSON.message
+                            ? xhr.responseJSON.message
+                            : 'Unable to load students for this class.';
+                        toastr.error(message);
+                    }
                 }
             });
         }
@@ -209,13 +244,14 @@
                     url: "{{ route('teacher.report.getSubjects') }}",
                     type: "GET",
                     data: { class_id: class_id },
+                    dataType: "json",
                     success: function(data) {
                         $('#subject_id').empty();
-                        $('#subject_id').append('<option value="" selected disabled>Select Subject</option>');
+                        $('#subject_id').append(new Option('Select Subject', '', true, true));
                         if (data && data.length > 0) {
                             $.each(data, function(key, value) {
                                 if (value && value.id) {
-                                    $('#subject_id').append('<option value="' + value.id + '">' + value.name + '</option>');
+                                    $('#subject_id').append(new Option(value.name, value.id));
                                 }
                             });
                         }
@@ -233,12 +269,40 @@
         $('#target').on('change', function() {
             if ($(this).val() == 'specific') {
                 $('#specific_students_div').show();
-                $('#student_ids').attr('required', true);
+                $('#student_ids').prop('required', true);
                 var class_id = $('#class_id').val();
                 fetchStudentsForClass(class_id);
             } else {
                 $('#specific_students_div').hide();
-                $('#student_ids').attr('required', false);
+                $('#student_ids').prop('required', false).val(null).trigger('change');
+            }
+        });
+
+        $('#activity-report-form').on('submit', function(e) {
+            if (typeof CKEDITOR !== 'undefined') {
+                for (var instance in CKEDITOR.instances) {
+                    CKEDITOR.instances[instance].updateElement();
+                }
+            }
+
+            if (!$.trim($('#editor1').val())) {
+                e.preventDefault();
+                if (typeof toastr !== 'undefined') {
+                    toastr.error('Please enter the report description.');
+                } else {
+                    alert('Please enter the report description.');
+                }
+                return;
+            }
+
+            var selectedStudents = $('#student_ids').val();
+            if ($('#target').val() === 'specific' && (!selectedStudents || selectedStudents.length === 0)) {
+                e.preventDefault();
+                if (typeof toastr !== 'undefined') {
+                    toastr.error('Please select at least one student.');
+                } else {
+                    alert('Please select at least one student.');
+                }
             }
         });
 
@@ -249,4 +313,4 @@
         }
     });
 </script>
-@endsection
+@endpush
