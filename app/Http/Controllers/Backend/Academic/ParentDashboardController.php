@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Backend\Academic;
 use App\Http\Controllers\Controller;
 use App\Models\AccountStudentFee;
 use App\Models\FeeCategoryAmount;
+use App\Models\Report;
 use App\Models\SchoolSubject;
 use App\Models\StudentMarks;
 use App\Models\StudentYear;
@@ -59,8 +60,19 @@ class ParentDashboardController extends Controller
         $results = collect();
         $feeSummary = ['total_fees' => 0, 'paid' => 0, 'balance' => 0];
         $paymentHistory = collect();
+        $activityReports = collect();
 
         if ($selectedChild) {
+            $activityReports = Report::with(['teacher', 'studentClass', 'subject'])
+                ->where('status', 'approved')
+                ->whereHas('students', function ($query) use ($selectedChild) {
+                    $query->where('student_id', $selectedChild->id);
+                })
+                ->orderByDesc('approved_at')
+                ->orderByDesc('id')
+                ->limit(5)
+                ->get();
+
             $results = StudentMarks::query()
                 ->with(['subject', 'student_class', 'exam_type', 'year'])
                 ->where('student_id', $selectedChild->id)
@@ -112,6 +124,7 @@ class ParentDashboardController extends Controller
             'subjects' => SchoolSubject::query()->orderBy('name')->get(),
             'filters' => $filters,
             'paymentHistory' => $paymentHistory,
+            'activityReports' => $activityReports,
             'activeTab' => $activeTab,
             ...app(SchoolScheduleService::class)->dashboardData($parent),
         ]);

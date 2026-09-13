@@ -66,6 +66,40 @@
                                 </div>
                             </form>
 
+                            @if(in_array($activeTab, ['dashboard']))
+                                <hr>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h5 class="mb-0">Activity Reports</h5>
+                                    <a href="{{ route('parent.report.index') }}" class="btn btn-sm btn-outline-primary">View All</a>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-bordered">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th>Teacher</th>
+                                                <th>Class</th>
+                                                <th>Type</th>
+                                                <th>Title</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @forelse($activityReports as $report)
+                                                <tr>
+                                                    <td>{{ optional($report->approved_at ?? $report->created_at)->format('d M Y') }}</td>
+                                                    <td>{{ optional($report->teacher)->name }}</td>
+                                                    <td>{{ optional($report->studentClass)->name }}</td>
+                                                    <td><span class="badge badge-info">{{ ucfirst($report->report_type) }}</span></td>
+                                                    <td>{{ $report->title }}</td>
+                                                </tr>
+                                            @empty
+                                                <tr><td colspan="5">No approved activity reports for the selected child yet.</td></tr>
+                                            @endforelse
+                                        </tbody>
+                                    </table>
+                                </div>
+                            @endif
+
                             @if(in_array($activeTab, ['dashboard', 'fees']))
                                 <hr>
                                 <h5>Fee Summary</h5>

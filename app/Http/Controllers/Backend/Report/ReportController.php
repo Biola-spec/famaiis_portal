@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AssignStudent;
 use App\Models\Report;
 use App\Models\ReportMedia;
+use App\Models\SchoolSection;
 use App\Models\SchoolSubject;
 use App\Models\StudentClass;
 use App\Models\StudentSection;
@@ -25,7 +26,7 @@ class ReportController extends Controller
 
     public function teacherIndex()
     {
-        $reports = Report::with(['studentClass', 'subject'])
+        $reports = Report::with(['studentClass', 'subject', 'students'])
             ->where('teacher_id', Auth::id())
             ->orderBy('id', 'desc')
             ->paginate(20);
@@ -97,6 +98,7 @@ class ReportController extends Controller
             $report->title = $request->title;
             $report->description = $request->description;
             $report->is_for_all = ($request->target == 'all');
+            $report->status = 'pending';
 
             if ($request->hasFile('video')) {
                 $videoPath = $request->file('video')->store('reports/videos', 'public');
@@ -137,29 +139,22 @@ class ReportController extends Controller
                 }
             }
 
-            // Notifications
-            $parents = User::whereHas('children', function ($q) use ($report) {
-                $q->whereIn('student_id', $report->students()->pluck('student_id'));
-            })->get();
-
-            $admins = User::where('role', 'Admin')->get();
             $teacher = Auth::user();
+            $reviewers = $this->reportReviewers($report);
 
-            $notificationData = [
-                'report_id' => $report->id,
-                'title' => 'New ' . ucfirst($report->report_type) . ' Report: ' . $report->title,
-                'message' => 'A new report has been posted by ' . $teacher->name,
-                'type' => 'report'
-            ];
-
-            Notification::send($parents, new ReportNotification($notificationData));
-            Notification::send($admins, new ReportNotification($notificationData));
-            $teacher->notify(new ReportNotification(array_merge($notificationData, ['title' => 'Report Published: ' . $report->title, 'message' => 'Your report has been successfully published.'])));
+            if ($reviewers->isNotEmpty()) {
+                Notification::send($reviewers, new ReportNotification([
+                    'report_id' => $report->id,
+                    'title' => 'Activity report awaiting approval: ' . $report->title,
+                    'message' => 'A new report has been submitted by ' . $teacher->name . ' and needs approval before students and parents can see it.',
+                    'type' => 'report_approval',
+                ]));
+            }
         });
 
         return redirect()->route('teacher.report.index')->with([
-            'message' => 'Report created successfully.',
-            'alert-type' => 'success',
+            'message' => 'Report submitted successfully and is waiting for approval before students and parents can see it.',
+            'alert-type' => 'info',
         ]);
     }
 
@@ -257,6 +252,7 @@ class ReportController extends Controller
         $childIds = $user->children()->pluck('student_id');
 
         $query = Report::with(['teacher', 'studentClass', 'subject', 'media', 'students'])
+            ->where('status', 'approved')
             ->whereHas('students', function ($q) use ($childIds) {
                 $q->whereIn('student_id', $childIds);
             });
@@ -268,14 +264,36 @@ class ReportController extends Controller
             $query->whereDate('created_at', $request->date);
         }
 
-        $reports = $query->orderBy('id', 'desc')->paginate(10);
+        $reports = $query->orderByDesc('approved_at')->orderByDesc('id')->paginate(10);
 
         return view('backend.report.parent.index', compact('reports'));
     }
 
+    public function studentIndex(Request $request)
+    {
+        $studentId = Auth::id();
+
+        $query = Report::with(['teacher', 'studentClass', 'subject', 'media', 'students'])
+            ->where('status', 'approved')
+            ->whereHas('students', function ($q) use ($studentId) {
+                $q->where('student_id', $studentId);
+            });
+
+        if ($request->report_type) {
+            $query->where('report_type', $request->report_type);
+        }
+        if ($request->date) {
+            $query->whereDate('created_at', $request->date);
+        }
+
+        $reports = $query->orderByDesc('approved_at')->orderByDesc('id')->paginate(10);
+
+        return view('backend.report.student.index', compact('reports'));
+    }
+
     public function markAsSeen($id)
     {
-        $report = Report::findOrFail($id);
+        $report = Report::where('status', 'approved')->findOrFail($id);
         $user = Auth::user();
         $childIds = $user->children()->pluck('student_id');
 
@@ -290,7 +308,14 @@ class ReportController extends Controller
 
     public function adminIndex(Request $request)
     {
-        $query = Report::with(['teacher', 'studentClass', 'subject']);
+        $query = Report::with(['teacher', 'studentClass', 'subject', 'approvedBy', 'recalledBy', 'students']);
+        $user = Auth::user();
+
+        if (!$this->isAdminUser($user)) {
+            $headClassIds = $this->headSectionClassIds($user);
+            abort_if($headClassIds->isEmpty(), 403);
+            $query->whereIn('class_id', $headClassIds);
+        }
 
         if ($request->class_id) {
             $query->where('class_id', $request->class_id);
@@ -301,17 +326,61 @@ class ReportController extends Controller
         if ($request->report_type) {
             $query->where('report_type', $request->report_type);
         }
+        if ($request->status) {
+            $query->where('status', $request->status);
+        }
 
         $reports = $query->orderBy('id', 'desc')->paginate(20);
-        $classes = StudentClass::all();
+        $classes = $this->isAdminUser($user)
+            ? StudentClass::all()
+            : StudentClass::whereIn('id', $this->headSectionClassIds($user))->get();
         $teachers = User::whereIn('role', ['Teacher', 'Staff'])->get();
 
         return view('backend.report.admin.index', compact('reports', 'classes', 'teachers'));
     }
 
+    public function approve($id)
+    {
+        $report = Report::with(['teacher', 'students'])->findOrFail($id);
+        abort_unless($this->canModerateReport($report), 403);
+
+        $report->update([
+            'status' => 'approved',
+            'approved_by' => Auth::id(),
+            'approved_at' => now(),
+            'recalled_by' => null,
+            'recalled_at' => null,
+        ]);
+
+        $this->notifyReportAudience($report);
+
+        return redirect()->back()->with([
+            'message' => 'Report approved and sent to students and parents.',
+            'alert-type' => 'success',
+        ]);
+    }
+
+    public function recall($id)
+    {
+        $report = Report::findOrFail($id);
+        abort_unless($this->canModerateReport($report), 403);
+
+        $report->update([
+            'status' => 'recalled',
+            'recalled_by' => Auth::id(),
+            'recalled_at' => now(),
+        ]);
+
+        return redirect()->back()->with([
+            'message' => 'Report recalled. Students and parents will no longer see it.',
+            'alert-type' => 'warning',
+        ]);
+    }
+
     public function destroy($id)
     {
         $report = Report::findOrFail($id);
+        abort_unless($this->canModerateReport($report), 403);
         
         // Delete files
         if ($report->video_path) {
@@ -327,5 +396,73 @@ class ReportController extends Controller
             'message' => 'Report deleted successfully.',
             'alert-type' => 'success',
         ]);
+    }
+
+    private function notifyReportAudience(Report $report): void
+    {
+        $report->loadMissing(['teacher', 'students']);
+        $studentIds = $report->students->pluck('id');
+
+        $students = User::whereIn('id', $studentIds)->get();
+        $parents = User::whereHas('children', function ($q) use ($studentIds) {
+            $q->whereIn('student_id', $studentIds);
+        })->get();
+
+        $notificationData = [
+            'report_id' => $report->id,
+            'title' => 'New ' . ucfirst($report->report_type) . ' Report: ' . $report->title,
+            'message' => 'A new report has been posted by ' . optional($report->teacher)->name,
+            'type' => 'report',
+        ];
+
+        Notification::send($students, new ReportNotification($notificationData));
+        Notification::send($parents, new ReportNotification($notificationData));
+    }
+
+    private function reportReviewers(Report $report)
+    {
+        $admins = User::query()
+            ->where(function ($query) {
+                $query->where('role', 'Admin')->orWhere('usertype', 'Admin');
+            })
+            ->get();
+
+        $headTeacherIds = SchoolSection::query()
+            ->whereHas('classes', function ($query) use ($report) {
+                $query->where('id', $report->class_id);
+            })
+            ->whereNotNull('head_teacher_id')
+            ->pluck('head_teacher_id');
+
+        $heads = User::whereIn('id', $headTeacherIds)->get();
+
+        return $admins->merge($heads)->unique('id')->values();
+    }
+
+    private function canModerateReport(Report $report): bool
+    {
+        $user = Auth::user();
+
+        if ($this->isAdminUser($user)) {
+            return true;
+        }
+
+        return $this->headSectionClassIds($user)->contains($report->class_id);
+    }
+
+    private function isAdminUser(?User $user): bool
+    {
+        return $user && ($user->role === 'Admin' || $user->hasRole('Admin', 'Super Admin'));
+    }
+
+    private function headSectionClassIds(?User $user)
+    {
+        if (!$user) {
+            return collect();
+        }
+
+        return StudentClass::query()
+            ->whereIn('section_id', SchoolSection::where('head_teacher_id', $user->id)->pluck('id'))
+            ->pluck('id');
     }
 }

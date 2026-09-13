@@ -38,7 +38,15 @@
                                             <option value="yearly" {{ request('report_type') == 'yearly' ? 'selected' : '' }}>Yearly</option>
                                         </select>
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-md-2">
+                                        <select name="status" class="form-control">
+                                            <option value="">All Statuses</option>
+                                            <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>Pending</option>
+                                            <option value="approved" {{ request('status') == 'approved' ? 'selected' : '' }}>Approved</option>
+                                            <option value="recalled" {{ request('status') == 'recalled' ? 'selected' : '' }}>Recalled</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-1">
                                         <button type="submit" class="btn btn-primary btn-block">Filter Results</button>
                                     </div>
                                 </div>
@@ -53,6 +61,7 @@
                                             <th>Class</th>
                                             <th>Subject</th>
                                             <th>Type</th>
+                                            <th>Status</th>
                                             <th>Title</th>
                                             <th>Stats</th>
                                             <th>Action</th>
@@ -66,6 +75,18 @@
                                             <td>{{ $report->studentClass->name }}</td>
                                             <td>{{ $report->subject->name ?? 'General' }}</td>
                                             <td><span class="badge badge-info">{{ ucfirst($report->report_type) }}</span></td>
+                                            <td>
+                                                @php($statusMap = ['pending' => 'warning', 'approved' => 'success', 'recalled' => 'danger'])
+                                                <span class="badge badge-{{ $statusMap[$report->status ?? 'pending'] ?? 'secondary' }}">
+                                                    {{ ucfirst($report->status ?? 'pending') }}
+                                                </span>
+                                                @if($report->approvedBy)
+                                                    <br><small>By {{ $report->approvedBy->name }}</small>
+                                                @endif
+                                                @if($report->recalledBy)
+                                                    <br><small>Recalled by {{ $report->recalledBy->name }}</small>
+                                                @endif
+                                            </td>
                                             <td>{{ $report->title }}</td>
                                             <td>
                                                 @php
@@ -75,6 +96,22 @@
                                                 <span class="badge badge-pill badge-success" title="Seen by Parents">{{ $seenCount }} / {{ $totalCount }}</span>
                                             </td>
                                             <td>
+                                                @if(($report->status ?? 'pending') !== 'approved')
+                                                    <form action="{{ route('admin.report.approve', $report->id) }}" method="POST" class="d-inline">
+                                                        @csrf
+                                                        <button type="submit" class="btn btn-success btn-sm">
+                                                            <i class="fa fa-check"></i> Approve
+                                                        </button>
+                                                    </form>
+                                                @endif
+                                                @if(($report->status ?? 'pending') === 'approved')
+                                                    <form action="{{ route('admin.report.recall', $report->id) }}" method="POST" class="d-inline">
+                                                        @csrf
+                                                        <button type="submit" class="btn btn-warning btn-sm">
+                                                            <i class="fa fa-undo"></i> Recall
+                                                        </button>
+                                                    </form>
+                                                @endif
                                                 <a href="{{ route('admin.report.delete', $report->id) }}" class="btn btn-danger btn-sm" id="delete"><i class="fa fa-trash"></i> Delete</a>
                                             </td>
                                         </tr>

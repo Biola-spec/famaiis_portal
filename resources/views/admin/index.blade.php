@@ -129,6 +129,45 @@
 
 @include('admin.body.school_schedule_widget')
 
+@if(Auth::user()->hasRole('Student'))
+<div class="col-xl-8 col-12">
+    <div class="box">
+        <div class="box-header with-border d-flex align-items-center justify-content-between">
+            <h4 class="box-title mb-0">Activity Reports</h4>
+            <a href="{{ route('student.report.index') }}" class="btn btn-sm btn-outline-primary">View All</a>
+        </div>
+        <div class="box-body">
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Teacher</th>
+                            <th>Class</th>
+                            <th>Type</th>
+                            <th>Title</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse(($activity_reports ?? collect()) as $report)
+                            <tr>
+                                <td>{{ optional($report->approved_at ?? $report->created_at)->format('d M Y') }}</td>
+                                <td>{{ optional($report->teacher)->name }}</td>
+                                <td>{{ optional($report->studentClass)->name }}</td>
+                                <td><span class="badge badge-info">{{ ucfirst($report->report_type) }}</span></td>
+                                <td>{{ $report->title }}</td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="5">No approved activity reports yet.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+@endif
+
 @endif
 
 				</div>

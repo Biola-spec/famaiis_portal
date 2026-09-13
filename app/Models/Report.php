@@ -19,6 +19,18 @@ class Report extends Model
         'video_path',
         'video_thumbnail',
         'is_for_all',
+        'status',
+        'approved_by',
+        'approved_at',
+        'recalled_by',
+        'recalled_at',
+        'approval_note',
+    ];
+
+    protected $casts = [
+        'is_for_all' => 'boolean',
+        'approved_at' => 'datetime',
+        'recalled_at' => 'datetime',
     ];
 
     public function teacher()
@@ -39,6 +51,16 @@ class Report extends Model
     public function media()
     {
         return $this->hasMany(ReportMedia::class);
+    }
+
+    public function approvedBy()
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function recalledBy()
+    {
+        return $this->belongsTo(User::class, 'recalled_by');
     }
 
     public function students()

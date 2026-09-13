@@ -20,6 +20,7 @@
                                             <th>Class</th>
                                             <th>Subject</th>
                                             <th>Type</th>
+                                            <th>Status</th>
                                             <th>Title</th>
                                             <th>Attachments</th>
                                             <th>Seen By</th>
@@ -34,6 +35,12 @@
                                             <td>{{ $report->studentClass->name }}</td>
                                             <td>{{ $report->subject->name ?? 'General' }}</td>
                                             <td><span class="badge badge-info">{{ ucfirst($report->report_type) }}</span></td>
+                                            <td>
+                                                @php($statusMap = ['pending' => 'warning', 'approved' => 'success', 'recalled' => 'danger'])
+                                                <span class="badge badge-{{ $statusMap[$report->status ?? 'pending'] ?? 'secondary' }}">
+                                                    {{ ucfirst($report->status ?? 'pending') }}
+                                                </span>
+                                            </td>
                                             <td>{{ $report->title }}</td>
                                             <td>
                                                 @if($report->video_path) <i class="fa fa-video-camera text-primary"></i> @endif

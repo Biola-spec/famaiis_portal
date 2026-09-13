@@ -781,9 +781,16 @@ Route::middleware(['auth'])->prefix('activity-reports')->group(function(){
         Route::post('/parent/seen/{id}', [ReportController::class, 'markAsSeen'])->name('parent.report.seen');
     });
 
-    // Admin Routes
-    Route::middleware('role:Admin')->group(function(){
+    // Student Routes
+    Route::middleware('role:Student')->group(function(){
+        Route::get('/student/view', [ReportController::class, 'studentIndex'])->name('student.report.index');
+    });
+
+    // Admin / Head of Section Routes
+    Route::middleware('role:Admin,Teacher,Staff')->group(function(){
         Route::get('/admin/view', [ReportController::class, 'adminIndex'])->name('admin.report.index');
+        Route::post('/admin/approve/{id}', [ReportController::class, 'approve'])->name('admin.report.approve');
+        Route::post('/admin/recall/{id}', [ReportController::class, 'recall'])->name('admin.report.recall');
         Route::get('/admin/delete/{id}', [ReportController::class, 'destroy'])->name('admin.report.delete');
     });
 });

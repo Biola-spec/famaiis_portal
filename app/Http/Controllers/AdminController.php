@@ -148,6 +148,16 @@ class AdminController extends Controller
 
         // Fetch active/scheduled live sessions for students based on enrollment or show all for admin
         if ($user->hasRole('Student')) {
+            $data['activity_reports'] = \App\Models\Report::with(['teacher', 'studentClass', 'subject'])
+                ->where('status', 'approved')
+                ->whereHas('students', function ($query) use ($user) {
+                    $query->where('student_id', $user->id);
+                })
+                ->orderByDesc('approved_at')
+                ->orderByDesc('id')
+                ->limit(5)
+                ->get();
+
             $enrollments = \DB::table('student_section')
                 ->where('student_id', $user->id)
                 ->where('is_active', true)

@@ -9,6 +9,7 @@
  $is_parent = $user->hasRole('Parent');
  $is_student = $user->hasRole('Student');
  $is_accountant = $user->hasRole('Accountant');
+ $is_section_head = \App\Models\SchoolSection::where('head_teacher_id', $user->id)->exists();
 @endphp
 
 
@@ -384,6 +385,24 @@
         </li>
 @endif
 
+@if($is_parent || $is_student)
+        <li class="header nav-small-cap">Activity</li>
+        @if($is_parent)
+        <li class="{{ ($route == 'parent.report.index')?'active':'' }}">
+          <a href="{{ route('parent.report.index') }}">
+            <i data-feather="file-text"></i> <span>Activity Reports</span>
+          </a>
+        </li>
+        @endif
+        @if($is_student)
+        <li class="{{ ($route == 'student.report.index')?'active':'' }}">
+          <a href="{{ route('student.report.index') }}">
+            <i data-feather="file-text"></i> <span>Activity Reports</span>
+          </a>
+        </li>
+        @endif
+@endif
+
 
 @if(!$is_parent && !$is_student && ($is_admin || $is_teacher || $user->hasPermission('view_reports')))
         <li class="header nav-small-cap">Report Interface</li>
@@ -412,7 +431,9 @@
 
     @if($user->hasPermission('manage_users'))
            <li class="{{ ($route == 'student.idcard.view')?'active':'' }}"><a href="{{ route('student.idcard.view') }}"><i class="ti-more"></i>Student ID Card </a></li>
-           <li class="{{ ($route == 'admin.report.index')?'active':'' }}"><a href="{{ route('admin.report.index') }}"><i class="ti-more"></i>All Activity Reports </a></li>
+    @endif
+    @if($user->hasPermission('manage_users') || $is_section_head)
+           <li class="{{ ($route == 'admin.report.index')?'active':'' }}"><a href="{{ route('admin.report.index') }}"><i class="ti-more"></i>Activity Approval Queue </a></li>
     @endif
           </ul>
         </li>
