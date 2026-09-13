@@ -36,17 +36,19 @@ class ReportController extends Controller
 
     public function teacherCreate()
     {
-        $user = Auth::user();
-        if ($user->hasRole('Admin') || $user->role === 'Admin') {
-            $classes = StudentClass::orderBy('name')->get();
-        } else {
-            $assignmentClassIds = TeacherAssignment::where('teacher_id', $user->id)->pluck('class_id');
-            $classTeacherClassIds = \App\Models\AssignClassTeacher::where('teacher_id', $user->id)->pluck('class_id');
-            $classIds = $assignmentClassIds->merge($classTeacherClassIds)->unique()->filter();
-            $classes = StudentClass::whereIn('id', $classIds)->orderBy('name')->get();
-        }
+        $classes = $this->teacherClasses(Auth::user());
 
         return view('backend.report.teacher.create', compact('classes'));
+    }
+
+    public function teacherEdit($id)
+    {
+        $report = Report::with(['students', 'media'])->findOrFail($id);
+        abort_unless($this->canTeacherManageReport($report), 403);
+
+        $classes = $this->teacherClasses(Auth::user());
+
+        return view('backend.report.teacher.create', compact('classes', 'report'));
     }
 
     public function getTeacherSubjects(Request $request)
@@ -158,6 +160,92 @@ class ReportController extends Controller
         ]);
     }
 
+    public function teacherUpdate(Request $request, $id)
+    {
+        $report = Report::with(['students', 'media'])->findOrFail($id);
+        abort_unless($this->canTeacherManageReport($report), 403);
+
+        $request->validate([
+            'class_id' => 'required',
+            'report_type' => 'required',
+            'title' => 'required|string|max:255',
+            'description' => 'required',
+            'video' => 'nullable|mimes:mp4,mov,ogg,qt|max:20480',
+            'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120',
+            'documents.*' => 'nullable|mimes:pdf,doc,docx,xls,xlsx|max:10240',
+            'target' => 'required',
+            'student_ids' => 'required_if:target,specific|array',
+        ]);
+
+        DB::transaction(function () use ($request, $report) {
+            $report->class_id = $request->class_id;
+            $report->subject_id = $request->subject_id;
+            $report->report_type = $request->report_type;
+            $report->title = $request->title;
+            $report->description = $request->description;
+            $report->is_for_all = ($request->target == 'all');
+            $report->status = 'pending';
+            $report->approved_by = null;
+            $report->approved_at = null;
+            $report->recalled_by = null;
+            $report->recalled_at = null;
+
+            if ($request->hasFile('video')) {
+                if ($report->video_path) {
+                    Storage::disk('public')->delete($report->video_path);
+                }
+                $report->video_path = $request->file('video')->store('reports/videos', 'public');
+            }
+
+            $report->save();
+
+            if ($report->is_for_all) {
+                $report->students()->sync(
+                    $this->getClassStudents((int) $request->class_id)->pluck('id')->all()
+                );
+            } else {
+                $report->students()->sync($request->student_ids);
+            }
+
+            if ($request->hasFile('images')) {
+                foreach ($request->file('images') as $file) {
+                    ReportMedia::create([
+                        'report_id' => $report->id,
+                        'file_path' => $file->store('reports/images', 'public'),
+                        'file_type' => 'image'
+                    ]);
+                }
+            }
+
+            if ($request->hasFile('documents')) {
+                foreach ($request->file('documents') as $file) {
+                    ReportMedia::create([
+                        'report_id' => $report->id,
+                        'file_path' => $file->store('reports/documents', 'public'),
+                        'file_type' => 'document'
+                    ]);
+                }
+            }
+
+            $teacher = Auth::user();
+            $reviewers = $this->reportReviewers($report);
+
+            if ($reviewers->isNotEmpty()) {
+                Notification::send($reviewers, new ReportNotification([
+                    'report_id' => $report->id,
+                    'title' => 'Activity report updated and awaiting approval: ' . $report->title,
+                    'message' => 'A report has been updated by ' . $teacher->name . ' and needs approval before students and parents can see it.',
+                    'type' => 'report_approval',
+                ]));
+            }
+        });
+
+        return redirect()->route('teacher.report.index')->with([
+            'message' => 'Report updated successfully and sent back for approval.',
+            'alert-type' => 'info',
+        ]);
+    }
+
     private function getClassStudents(int $classId)
     {
         $activeYear = getCurrentSession() ?? StudentYear::where('is_active', 1)->first() ?? StudentYear::first();
@@ -207,6 +295,24 @@ class ReportController extends Controller
         }
 
         return $students->sortBy('name')->values();
+    }
+
+    private function teacherClasses(?User $user)
+    {
+        if ($this->isAdminUser($user)) {
+            return StudentClass::orderBy('name')->get();
+        }
+
+        $assignmentClassIds = TeacherAssignment::where('teacher_id', $user->id)->pluck('class_id');
+        $classTeacherClassIds = \App\Models\AssignClassTeacher::where('teacher_id', $user->id)->pluck('class_id');
+        $classIds = $assignmentClassIds->merge($classTeacherClassIds)->unique()->filter();
+
+        return StudentClass::whereIn('id', $classIds)->orderBy('name')->get();
+    }
+
+    private function canTeacherManageReport(Report $report): bool
+    {
+        return $this->isAdminUser(Auth::user()) || (int) $report->teacher_id === (int) Auth::id();
     }
 
     private function addStudentsToCollection($students, $studentRecords): void

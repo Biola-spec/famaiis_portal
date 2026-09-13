@@ -53,7 +53,7 @@
                                                 </span>
                                             </td>
                                             <td>
-                                                <a href="#" class="btn btn-info btn-sm" title="View"><i class="fa fa-eye"></i></a>
+                                                <a href="{{ route('teacher.report.edit', $report->id) }}" class="btn btn-info btn-sm" title="Edit"><i class="fa fa-edit"></i></a>
                                                 <a href="{{ route('admin.report.delete', $report->id) }}" class="btn btn-danger btn-sm" id="delete" title="Delete"><i class="fa fa-trash"></i></a>
                                             </td>
                                         </tr>
