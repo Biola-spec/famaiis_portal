@@ -7,7 +7,7 @@
                 <div class="col-12">
                     <div class="box">
                         <div class="box-header with-border">
-                            <h3 class="box-title">All Reports Monitoring</h3>
+                            <h3 class="box-title">All Teachers Activity Reports / Approval Queue</h3>
                         </div>
                         <div class="box-body">
                             <!-- Filters -->
@@ -68,7 +68,7 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        @foreach($reports as $report)
+                                        @forelse($reports as $report)
                                         <tr>
                                             <td>{{ $report->created_at->format('d M Y') }}</td>
                                             <td>{{ $report->teacher->name }}</td>
@@ -115,7 +115,11 @@
                                                 <a href="{{ route('admin.report.delete', $report->id) }}" class="btn btn-danger btn-sm" id="delete"><i class="fa fa-trash"></i> Delete</a>
                                             </td>
                                         </tr>
-                                        @endforeach
+                                        @empty
+                                        <tr>
+                                            <td colspan="9" class="text-center">No teacher activity reports found.</td>
+                                        </tr>
+                                        @endforelse
                                     </tbody>
                                 </table>
                                 {{ $reports->links() }}

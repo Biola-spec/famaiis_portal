@@ -236,10 +236,18 @@
         </li>
 @endif
 
-@if($is_teacher || $is_admin)
+@if($is_admin || $is_section_head)
+<li class="{{ ($route == 'admin.report.index')?'active':'' }}">
+    <a href="{{ route('admin.report.index') }}">
+        <i data-feather="check-square"></i> <span>Approve Activity Reports</span>
+    </a>
+</li>
+@endif
+
+@if($is_teacher)
 <li class="{{ (str_starts_with($route, 'teacher.report.'))?'active':'' }}">
     <a href="{{ route('teacher.report.index') }}">
-        <i data-feather="clipboard"></i> <span>{{ __('ui.reports_activities') }}</span>
+        <i data-feather="clipboard"></i> <span>My Reports / Activities</span>
     </a>
 </li>
 @endif
