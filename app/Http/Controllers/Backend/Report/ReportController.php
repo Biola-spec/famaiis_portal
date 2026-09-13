@@ -43,12 +43,29 @@ class ReportController extends Controller
 
     public function teacherEdit($id)
     {
-        $report = Report::with(['students', 'media'])->findOrFail($id);
+        $report = Report::with(['students', 'media', 'subject'])->findOrFail($id);
         abort_unless($this->canTeacherManageReport($report), 403);
+
+        if (!$this->isAdminUser(Auth::user()) && ($report->status ?? 'pending') === 'approved') {
+            return redirect()->route('teacher.report.index')->with([
+                'message' => 'Recall the approved report before making amendments.',
+                'alert-type' => 'warning',
+            ]);
+        }
 
         $classes = $this->teacherClasses(Auth::user());
 
         return view('backend.report.teacher.create', compact('classes', 'report'));
+    }
+
+    public function show($id)
+    {
+        $report = Report::with(['teacher', 'studentClass', 'subject', 'students', 'media', 'approvedBy', 'recalledBy'])
+            ->findOrFail($id);
+
+        abort_unless($this->canViewReportInStaffArea($report), 403);
+
+        return view('backend.report.teacher.show', compact('report'));
     }
 
     public function getTeacherSubjects(Request $request)
@@ -240,8 +257,32 @@ class ReportController extends Controller
             }
         });
 
-        return redirect()->route('teacher.report.index')->with([
+        return redirect()->route($this->isAdminUser(Auth::user()) ? 'admin.report.index' : 'teacher.report.index')->with([
             'message' => 'Report updated successfully and sent back for approval.',
+            'alert-type' => 'info',
+        ]);
+    }
+
+    public function teacherRecall($id)
+    {
+        $report = Report::findOrFail($id);
+        abort_unless((int) $report->teacher_id === (int) Auth::id(), 403);
+
+        if (($report->status ?? 'pending') !== 'approved') {
+            return redirect()->back()->with([
+                'message' => 'Only approved reports can be recalled for amendment.',
+                'alert-type' => 'warning',
+            ]);
+        }
+
+        $report->update([
+            'status' => 'recalled',
+            'recalled_by' => Auth::id(),
+            'recalled_at' => now(),
+        ]);
+
+        return redirect()->route('teacher.report.edit', $report->id)->with([
+            'message' => 'Report recalled. Make your amendment and submit it again for approval.',
             'alert-type' => 'info',
         ]);
     }
@@ -313,6 +354,11 @@ class ReportController extends Controller
     private function canTeacherManageReport(Report $report): bool
     {
         return $this->isAdminUser(Auth::user()) || (int) $report->teacher_id === (int) Auth::id();
+    }
+
+    private function canViewReportInStaffArea(Report $report): bool
+    {
+        return $this->canTeacherManageReport($report) || $this->canModerateReport($report);
     }
 
     private function addStudentsToCollection($students, $studentRecords): void

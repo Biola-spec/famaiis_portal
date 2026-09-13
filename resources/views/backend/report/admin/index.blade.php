@@ -89,13 +89,17 @@
                                             </td>
                                             <td>{{ $report->title }}</td>
                                             <td>
-                                                @php
-                                                    $seenCount = $report->students->whereNotNull('pivot.seen_at')->count();
-                                                    $totalCount = $report->students->count();
-                                                @endphp
-                                                <span class="badge badge-pill badge-success" title="Seen by Parents">{{ $seenCount }} / {{ $totalCount }}</span>
+                                                <span class="badge badge-pill badge-success" title="Seen by Parents">
+                                                    {{ $report->students->whereNotNull('pivot.seen_at')->count() }} / {{ $report->students->count() }}
+                                                </span>
                                             </td>
                                             <td>
+                                                <a href="{{ route('teacher.report.show', $report->id) }}" class="btn btn-primary btn-sm">
+                                                    <i class="fa fa-eye"></i> View
+                                                </a>
+                                                <a href="{{ route('teacher.report.edit', $report->id) }}" class="btn btn-info btn-sm">
+                                                    <i class="fa fa-edit"></i> Edit
+                                                </a>
                                                 @if(($report->status ?? 'pending') !== 'approved')
                                                     <form action="{{ route('admin.report.approve', $report->id) }}" method="POST" class="d-inline">
                                                         @csrf

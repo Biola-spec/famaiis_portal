@@ -53,8 +53,17 @@
                                                 </span>
                                             </td>
                                             <td>
-                                                <a href="{{ route('teacher.report.edit', $report->id) }}" class="btn btn-info btn-sm" title="Edit"><i class="fa fa-edit"></i></a>
-                                                <a href="{{ route('admin.report.delete', $report->id) }}" class="btn btn-danger btn-sm" id="delete" title="Delete"><i class="fa fa-trash"></i></a>
+                                                <a href="{{ route('teacher.report.show', $report->id) }}" class="btn btn-primary btn-sm" title="View"><i class="fa fa-eye"></i></a>
+                                                @if(($report->status ?? 'pending') === 'approved')
+                                                    <form action="{{ route('teacher.report.recall', $report->id) }}" method="POST" class="d-inline">
+                                                        @csrf
+                                                        <button type="submit" class="btn btn-warning btn-sm" title="Recall for amendment">
+                                                            <i class="fa fa-undo"></i>
+                                                        </button>
+                                                    </form>
+                                                @else
+                                                    <a href="{{ route('teacher.report.edit', $report->id) }}" class="btn btn-info btn-sm" title="Edit"><i class="fa fa-edit"></i></a>
+                                                @endif
                                             </td>
                                         </tr>
                                         @endforeach

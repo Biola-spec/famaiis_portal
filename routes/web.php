@@ -771,8 +771,10 @@ Route::middleware(['auth'])->prefix('activity-reports')->group(function(){
         Route::get('/teacher/view', [ReportController::class, 'teacherIndex'])->name('teacher.report.index');
         Route::get('/teacher/add', [ReportController::class, 'teacherCreate'])->name('teacher.report.add');
         Route::post('/teacher/store', [ReportController::class, 'teacherStore'])->name('teacher.report.store');
+        Route::get('/teacher/show/{id}', [ReportController::class, 'show'])->name('teacher.report.show');
         Route::get('/teacher/edit/{id}', [ReportController::class, 'teacherEdit'])->name('teacher.report.edit');
         Route::post('/teacher/update/{id}', [ReportController::class, 'teacherUpdate'])->name('teacher.report.update');
+        Route::post('/teacher/recall/{id}', [ReportController::class, 'teacherRecall'])->name('teacher.report.recall');
         Route::get('/teacher/get-subjects', [ReportController::class, 'getTeacherSubjects'])->name('teacher.report.getSubjects');
         Route::get('/teacher/get-students', [ReportController::class, 'getTeacherStudents'])->name('teacher.report.getStudents');
     });
