@@ -61,14 +61,16 @@ class MarksController extends Controller
                     $data->student_id = $request->student_id[$i];
                     $data->id_no = $request->id_no[$i];
                     $data->marks = $request->marks[$i];
+                    $data->status = 'pending';
+                    $data->entered_by = Auth::id();
                     $data->save();
                 }
     		} // end for loop
     	}// end if conditon
 
 			$notification = array(
-    		'message' => 'Student Marks Inserted Successfully',
-    		'alert-type' => 'success'
+    		'message' => 'Student Marks Inserted Successfully and waiting for approval before students or parents can view them.',
+    		'alert-type' => 'info'
     	);
 
     	return redirect()->back()->with($notification);
@@ -123,6 +125,26 @@ class MarksController extends Controller
 
     	$assign_subject = AssignSubject::find($request->assign_subject_id);
     	$subject_id = $assign_subject ? $assign_subject->subject_id : null;
+        $isAdmin = Auth::user()->hasRole('Admin', 'Super Admin') || in_array(Auth::user()->role, ['Admin', 'Super Admin']);
+
+        $existingApproved = StudentMarks::where('year_id',$request->year_id)
+            ->where('class_id',$request->class_id)
+            ->where(function($q) use ($request, $subject_id) {
+                $q->where('assign_subject_id', $request->assign_subject_id);
+                if ($subject_id) {
+                    $q->orWhere('subject_id', $subject_id);
+                }
+            })
+            ->where('term',$request->term)
+            ->where('status', 'approved')
+            ->exists();
+
+        if (!$isAdmin && $existingApproved) {
+            return redirect()->back()->with([
+                'message' => 'These marks are already approved. Ask admin/head to recall them before amendment.',
+                'alert-type' => 'warning',
+            ]);
+        }
 
     	StudentMarks::where('year_id',$request->year_id)
             ->where('class_id',$request->class_id)
@@ -149,14 +171,16 @@ class MarksController extends Controller
                     $data->student_id = $request->student_id[$i];
                     $data->id_no = $request->id_no[$i];
                     $data->marks = $request->marks[$i];
+                    $data->status = 'pending';
+                    $data->entered_by = Auth::id();
                     $data->save();
                 }
     		} // end for loop
     	}// end if conditon
 
 			$notification = array(
-    		'message' => 'Student Marks Updated Successfully',
-    		'alert-type' => 'success'
+    		'message' => 'Student Marks Updated Successfully and sent back for approval.',
+    		'alert-type' => 'info'
     	);
 
     	return redirect()->back()->with($notification);

@@ -77,6 +77,7 @@ class ParentDashboardController extends Controller
                 ->with(['subject', 'student_class', 'exam_type', 'year'])
                 ->where('student_id', $selectedChild->id)
                 ->where('year_id', $sessionId)
+                ->where('status', 'approved')
                 ->when(!empty($filters['term']), function ($query) use ($filters) {
                     $query->where('term', $filters['term']);
                 })

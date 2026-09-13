@@ -15,6 +15,7 @@ class StudentController extends Controller
         
         // 1. Calculate Average Mark
         $avgMark = StudentMarks::where('student_id', $user->id)
+            ->where('status', 'approved')
             ->avg('marks');
             
         // 2. Mock Attendance (since full attendance logic might be complex)
@@ -25,6 +26,7 @@ class StudentController extends Controller
         // For example, recent marks updated or assignments
         $recentMarks = StudentMarks::with('subject')
             ->where('student_id', $user->id)
+            ->where('status', 'approved')
             ->orderBy('id', 'desc')
             ->limit(5)
             ->get()

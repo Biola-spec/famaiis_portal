@@ -58,12 +58,19 @@ class MarkSheetController extends Controller
             }
         }
 
+        $approvedOnly = auth()->check() && (
+            auth()->user()->hasRole('Parent', 'Student') ||
+            in_array(auth()->user()->role, ['Parent', 'Student'])
+        );
+
         return $reportCardService->render(
             (int) $year_id,
             (int) $class_id,
             $section_id ? (int) $section_id : null,
             (string) $term,
-            (string) $id_no
+            (string) $id_no,
+            false,
+            $approvedOnly
         );
     }
 

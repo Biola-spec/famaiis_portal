@@ -127,6 +127,7 @@ class ParentResultLinkController extends Controller
             ->with(['subject', 'student_class', 'exam_type', 'year'])
             ->where('student_id', $selectedChild->id)
             ->where('year_id', $sessionId)
+            ->where('status', 'approved')
             ->when($term, fn ($q) => $q->where('term', $term))
             ->when(!empty($validated['subject_id']), fn ($q) => $q->where('subject_id', $validated['subject_id']))
             ->orderBy('subject_id')
@@ -182,6 +183,7 @@ class ParentResultLinkController extends Controller
             ->where('student_id', $student->id)
             ->where('year_id', $yearId)
             ->where('term', $term)
+            ->where('status', 'approved')
             ->first();
 
         if (!$sample) {
@@ -199,6 +201,7 @@ class ParentResultLinkController extends Controller
             $sample->section_id ? (int) $sample->section_id : null,
             $term,
             (string) $student->id_no,
+            true,
             true
         );
 

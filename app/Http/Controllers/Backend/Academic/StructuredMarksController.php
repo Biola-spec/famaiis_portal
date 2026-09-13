@@ -16,6 +16,7 @@ use App\Models\AssignClassTeacher;
 use App\Models\AssignSubject;
 use App\Models\TeacherAssignment;
 use App\Models\StudentSection;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -66,6 +67,13 @@ class StructuredMarksController extends Controller
             'subjects' => $subjects,
             'years' => $years,
             'currentSession' => getCurrentSession(),
+            'initialFilters' => [
+                'year_id' => request('year_id'),
+                'section_id' => request('section_id'),
+                'class_id' => request('class_id'),
+                'subject_id' => request('subject_id'),
+                'term' => request('term'),
+            ],
         ]);
     }
 
@@ -500,7 +508,24 @@ class StructuredMarksController extends Controller
 
         $validStudentIds = $validStudentQuery->pluck('student_id')->flip();
 
-        DB::transaction(function () use ($validated, $setting, $validStudentIds, $session) {
+        $user = Auth::user();
+        $isAdmin = $this->isAdminUser($user);
+        $approvedExists = StudentMarks::query()
+            ->where('class_id', $validated['class_id'])
+            ->where('subject_id', $validated['subject_id'])
+            ->where('section_id', $validated['section_id'])
+            ->where('session_id', optional($session)->id)
+            ->where('term', $validated['term'])
+            ->where('status', 'approved')
+            ->exists();
+
+        if (!$isAdmin && $approvedExists) {
+            throw ValidationException::withMessages([
+                'student_marks' => 'These marks are already approved. Ask admin/head to recall them before amendment.',
+            ]);
+        }
+
+        DB::transaction(function () use ($validated, $setting, $validStudentIds, $session, $user) {
             foreach ($validated['student_marks'] as $row) {
                 if (!$validStudentIds->has((int) $row['student_id'])) {
                     throw ValidationException::withMessages([
@@ -609,6 +634,12 @@ class StructuredMarksController extends Controller
                         'total_score' => $total,
                         'grade' => $grade,
                         'marks' => $total,
+                        'status' => 'pending',
+                        'entered_by' => $user->id,
+                        'approved_by' => null,
+                        'approved_at' => null,
+                        'recalled_by' => null,
+                        'recalled_at' => null,
                     ]
                 );
             }
@@ -616,13 +647,13 @@ class StructuredMarksController extends Controller
 
         if ($request->expectsJson()) {
             return response()->json([
-                'message' => 'Results saved successfully.',
+                'message' => 'Results saved successfully and waiting for approval before students or parents can view them.',
             ]);
         }
 
         return redirect()->back()->with([
-            'message' => 'Results saved successfully.',
-            'alert-type' => 'success',
+            'message' => 'Results saved successfully and waiting for approval before students or parents can view them.',
+            'alert-type' => 'info',
         ]);
     }
 
@@ -636,16 +667,21 @@ class StructuredMarksController extends Controller
             'section_id' => ['nullable', Rule::exists('school_sections', 'id')],
             'subject_id' => ['nullable', Rule::exists('school_subjects', 'id')],
             'term' => ['nullable', Rule::in(['1st Term', '2nd Term', '3rd Term'])],
+            'status' => ['nullable', Rule::in(['pending', 'approved', 'recalled'])],
         ]);
 
         $query = StudentMarks::query()
-            ->with(['student', 'student_class', 'subject', 'year', 'section'])
+            ->with(['student', 'student_class', 'subject', 'year', 'section', 'enteredBy', 'approvedBy', 'recalledBy'])
             ->where('session_id', $filters['session_id'] ?? optional($session)->id);
 
         foreach (['class_id', 'section_id', 'subject_id', 'term'] as $filterKey) {
             if (!empty($filters[$filterKey])) {
                 $query->where($filterKey, $filters[$filterKey]);
             }
+        }
+
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
         }
 
         if (!Auth::user()->hasRole('Admin', 'Super Admin')) {
@@ -675,6 +711,54 @@ class StructuredMarksController extends Controller
             'terms' => ['1st Term', '2nd Term', '3rd Term'],
             'filters' => $filters,
             'currentSession' => $session,
+            'canModerateResults' => $this->isAdminUser(Auth::user()) || $this->headSectionClassIds(Auth::user())->isNotEmpty(),
+        ]);
+    }
+
+    public function approve(StudentMarks $mark)
+    {
+        abort_unless($this->canModerateMark($mark), 403);
+
+        $this->matchingMarkSet($mark)->update([
+            'status' => 'approved',
+            'approved_by' => Auth::id(),
+            'approved_at' => now(),
+            'recalled_by' => null,
+            'recalled_at' => null,
+        ]);
+
+        return redirect()->back()->with([
+            'message' => 'Result set approved. Students and parents can now view it.',
+            'alert-type' => 'success',
+        ]);
+    }
+
+    public function recall(StudentMarks $mark)
+    {
+        abort_unless($this->canRecallMark($mark), 403);
+
+        if (($mark->status ?? 'pending') !== 'approved') {
+            return redirect()->back()->with([
+                'message' => 'Only approved marks can be recalled.',
+                'alert-type' => 'warning',
+            ]);
+        }
+
+        $this->matchingMarkSet($mark)->update([
+            'status' => 'recalled',
+            'recalled_by' => Auth::id(),
+            'recalled_at' => now(),
+        ]);
+
+        return redirect()->route('academic.marks.entry', [
+            'year_id' => $mark->session_id ?: $mark->year_id,
+            'section_id' => $mark->section_id,
+            'class_id' => $mark->class_id,
+            'subject_id' => $mark->subject_id,
+            'term' => $mark->term,
+        ])->with([
+            'message' => 'Result recalled. Make the amendment and save again for approval.',
+            'alert-type' => 'info',
         ]);
     }
 
@@ -686,6 +770,66 @@ class StructuredMarksController extends Controller
             ->first();
 
         return $grade?->grade_name;
+    }
+
+    private function matchingMarkSet(StudentMarks $mark)
+    {
+        return StudentMarks::query()
+            ->where('class_id', $mark->class_id)
+            ->where('subject_id', $mark->subject_id)
+            ->where('section_id', $mark->section_id)
+            ->when($mark->session_id, fn ($query) => $query->where('session_id', $mark->session_id))
+            ->when(!$mark->session_id, fn ($query) => $query->where('year_id', $mark->year_id))
+            ->where('term', $mark->term);
+    }
+
+    private function canModerateMark(StudentMarks $mark): bool
+    {
+        $user = Auth::user();
+
+        if ($this->isAdminUser($user)) {
+            return true;
+        }
+
+        return $this->headSectionClassIds($user)->contains($mark->class_id);
+    }
+
+    private function canRecallMark(StudentMarks $mark): bool
+    {
+        if ($this->canModerateMark($mark)) {
+            return true;
+        }
+
+        if ((int) $mark->entered_by === (int) Auth::id()) {
+            return true;
+        }
+
+        return TeacherAssignment::query()
+            ->where('teacher_id', Auth::id())
+            ->where('class_id', $mark->class_id)
+            ->where('subject_id', $mark->subject_id)
+            ->when($mark->section_id, function ($query) use ($mark) {
+                $query->where(function ($q) use ($mark) {
+                    $q->where('section_id', $mark->section_id)->orWhereNull('section_id');
+                });
+            })
+            ->exists();
+    }
+
+    private function isAdminUser(?User $user): bool
+    {
+        return $user && ($user->hasRole('Admin', 'Super Admin') || in_array($user->role, ['Admin', 'Super Admin']));
+    }
+
+    private function headSectionClassIds(?User $user): Collection
+    {
+        if (!$user) {
+            return collect();
+        }
+
+        return StudentClass::query()
+            ->whereIn('section_id', SchoolSection::where('head_teacher_id', $user->id)->pluck('id'))
+            ->pluck('id');
     }
 
     public function exportExcel(Request $request)

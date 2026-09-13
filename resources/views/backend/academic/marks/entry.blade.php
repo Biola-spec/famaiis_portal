@@ -138,7 +138,7 @@
                                                 <select name="year_id" id="year_id" required class="form-control">
                                                     <option value="" selected disabled>Select Session</option>
                                                     @foreach($years as $year)
-                                                        <option value="{{ $year->id }}" {{ optional($currentSession)->id == $year->id ? 'selected' : '' }}>{{ $year->name }}</option>
+                                                        <option value="{{ $year->id }}" {{ (($initialFilters['year_id'] ?? null) ?: optional($currentSession)->id) == $year->id ? 'selected' : '' }}>{{ $year->name }}</option>
                                                     @endforeach
                                                 </select>
                                             </div>
@@ -151,7 +151,7 @@
                                                 <select name="section_id" id="section_id" required class="form-control">
                                                     <option value="" selected>All Sections</option>
                                                     @foreach($sections as $section)
-                                                        <option value="{{ $section->id }}">{{ $section->name }}</option>
+                                                        <option value="{{ $section->id }}" {{ ($initialFilters['section_id'] ?? null) == $section->id ? 'selected' : '' }}>{{ $section->name }}</option>
                                                     @endforeach
                                                 </select>
                                             </div>
@@ -164,7 +164,7 @@
                                                 <select name="class_id" id="class_id" required class="form-control">
                                                     <option value="" selected disabled>Select Class</option>
                                                     @foreach($classes as $class)
-                                                        <option value="{{ $class->id }}">{{ $class->name }}</option>
+                                                        <option value="{{ $class->id }}" {{ ($initialFilters['class_id'] ?? null) == $class->id ? 'selected' : '' }}>{{ $class->name }}</option>
                                                     @endforeach
                                                 </select>
                                             </div>
@@ -176,9 +176,9 @@
                                             <div class="controls">
                                                 <select name="term" id="term" required class="form-control">
                                                     <option value="" selected disabled>Select Term</option>
-                                                    <option value="1st Term">1st Term</option>
-                                                    <option value="2nd Term">2nd Term</option>
-                                                    <option value="3rd Term">3rd Term</option>
+                                                    <option value="1st Term" {{ ($initialFilters['term'] ?? null) === '1st Term' ? 'selected' : '' }}>1st Term</option>
+                                                    <option value="2nd Term" {{ ($initialFilters['term'] ?? null) === '2nd Term' ? 'selected' : '' }}>2nd Term</option>
+                                                    <option value="3rd Term" {{ ($initialFilters['term'] ?? null) === '3rd Term' ? 'selected' : '' }}>3rd Term</option>
                                                 </select>
                                             </div>
                                         </div>
@@ -190,7 +190,7 @@
                                                 <select name="subject_id" id="subject_id" required class="form-control">
                                                     <option value="" selected disabled>Select Subject</option>
                                                     @foreach($subjects as $subject)
-                                                        <option value="{{ $subject->id }}">{{ $subject->name }}</option>
+                                                        <option value="{{ $subject->id }}" {{ ($initialFilters['subject_id'] ?? null) == $subject->id ? 'selected' : '' }}>{{ $subject->name }}</option>
                                                     @endforeach
                                                 </select>
                                             </div>
@@ -398,6 +398,10 @@
             }
         });
     });
+
+    @if(!empty($initialFilters['class_id']) && !empty($initialFilters['subject_id']) && !empty($initialFilters['term']))
+        loadMarksContext();
+    @endif
 
     // Excel Export Handler
     $(document).on('click', '#export-excel-btn', function () {

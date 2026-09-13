@@ -18,12 +18,16 @@ class ReportCardService
     /**
      * @return \Illuminate\View\View|\Illuminate\Http\RedirectResponse
      */
-    public function render(int $yearId, int $classId, ?int $sectionId, string $term, string $idNo, bool $forPdf = false)
+    public function render(int $yearId, int $classId, ?int $sectionId, string $term, string $idNo, bool $forPdf = false, bool $approvedOnly = false)
     {
         $query = StudentMarks::where('year_id', $yearId)
             ->where('class_id', $classId)
             ->where('term', $term)
             ->where('id_no', $idNo);
+
+        if ($approvedOnly) {
+            $query->where('status', 'approved');
+        }
 
         if ($sectionId) {
             $query->where('section_id', $sectionId);
@@ -45,6 +49,10 @@ class ReportCardService
             ->where('id_no', $idNo)
             ->whereNotNull('marks')
             ->where('marks', '!=', '');
+
+        if ($approvedOnly) {
+            $allMarksQuery->where('status', 'approved');
+        }
 
         if ($sectionId) {
             $allMarksQuery->where('section_id', $sectionId);
@@ -141,6 +149,7 @@ class ReportCardService
             'classTeacher',
             'setting',
             'forPdf',
+            'approvedOnly',
             'assessmentAreas',
             'attendance'
         ) + [

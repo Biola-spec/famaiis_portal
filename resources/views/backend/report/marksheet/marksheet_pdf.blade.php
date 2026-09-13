@@ -436,6 +436,10 @@
                     $positionQuery->where('section_id', $section_id);
                 }
 
+                if (!empty($approvedOnly)) {
+                    $positionQuery->where('status', 'approved');
+                }
+
                 $allStudentsMarks = $positionQuery->selectRaw('student_id, SUM(marks) as total')
                     ->groupBy('student_id')
                     ->orderByDesc('total')

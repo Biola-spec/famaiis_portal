@@ -37,6 +37,9 @@
 				<th>Type</th>
                 <th>Uploaded On</th>
                 <th>Due Date</th>
+                @if($is_admin || $is_teacher)
+                <th>Approval</th>
+                @endif
                 @if($is_student)
                 <th>Status</th>
                 @endif
@@ -72,6 +75,22 @@
                     @endif
                 </td>
 
+                @if($is_admin || $is_teacher)
+                <td>
+                    @php($approvalStatus = $homework->status ?? 'pending')
+                    @php($statusMap = ['pending' => 'warning', 'approved' => 'success', 'recalled' => 'danger'])
+                    <span class="badge badge-{{ $statusMap[$approvalStatus] ?? 'secondary' }}">
+                        {{ ucfirst($approvalStatus) }}
+                    </span>
+                    @if($homework->approvedBy)
+                        <br><small>By {{ $homework->approvedBy->name }}</small>
+                    @endif
+                    @if($homework->recalledBy)
+                        <br><small>Recalled by {{ $homework->recalledBy->name }}</small>
+                    @endif
+                </td>
+                @endif
+
                 @if($is_student)
                 <td>
                     @if($homework->type == 'homework')
@@ -95,7 +114,22 @@
                     @endif
 
                     @if($is_admin || $is_teacher)
-                        <a href="{{ route('homework.edit', $homework->id) }}" class="btn btn-sm btn-info" title="Edit"><i class="fa fa-edit"></i></a>
+                        @php($canModerateHomework = $is_admin || ($moderatedClassIds ?? collect())->contains($homework->class_id))
+                        @if(($homework->status ?? 'pending') !== 'approved' || $canModerateHomework)
+                            <a href="{{ route('homework.edit', $homework->id) }}" class="btn btn-sm btn-info" title="Edit"><i class="fa fa-edit"></i></a>
+                        @endif
+                        @if($canModerateHomework && ($homework->status ?? 'pending') !== 'approved')
+                            <form action="{{ route('homework.approve', $homework->id) }}" method="POST" class="d-inline">
+                                @csrf
+                                <button type="submit" class="btn btn-sm btn-success" title="Approve"><i class="fa fa-check"></i></button>
+                            </form>
+                        @endif
+                        @if(($homework->status ?? 'pending') === 'approved' && ($canModerateHomework || (int) $homework->teacher_id === (int) Auth::id()))
+                            <form action="{{ route('homework.recall', $homework->id) }}" method="POST" class="d-inline">
+                                @csrf
+                                <button type="submit" class="btn btn-sm btn-warning" title="Recall"><i class="fa fa-undo"></i></button>
+                            </form>
+                        @endif
                         <a href="{{ route('homework.delete', $homework->id) }}" class="btn btn-sm btn-danger" id="delete" title="Delete"><i class="fa fa-trash"></i></a>
                         @if($homework->type == 'homework')
                             <a href="{{ route('homework.submission.view', $homework->id) }}" class="btn btn-sm btn-secondary" title="View Submissions"><i class="fa fa-users"></i></a>

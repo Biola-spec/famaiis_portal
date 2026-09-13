@@ -580,6 +580,8 @@ Route::middleware(['auth', 'permission:view_results|view-results|upload_results|
     Route::post('marks/import-excel', [StructuredMarksController::class, 'importExcel'])->name('academic.marks.import');
 
     Route::get('results', [StructuredMarksController::class, 'results'])->name('academic.results.index');
+    Route::post('results/{mark}/approve', [StructuredMarksController::class, 'approve'])->name('academic.results.approve');
+    Route::post('results/{mark}/recall', [StructuredMarksController::class, 'recall'])->name('academic.results.recall');
 
     // Student Assessment Routes
     Route::get('assessment', [App\Http\Controllers\Backend\Academic\ClassTeacherAssessmentController::class, 'index'])->name('academic.assessment.index');
@@ -618,6 +620,8 @@ Route::middleware(['auth'])->prefix('homework')->group(function(){
     Route::post('/store', [HomeworkController::class, 'HomeworkStore'])->name('homework.store');
     Route::get('/edit/{id}', [HomeworkController::class, 'HomeworkEdit'])->name('homework.edit');
     Route::post('/update/{id}', [HomeworkController::class, 'HomeworkUpdate'])->name('homework.update');
+    Route::post('/approve/{id}', [HomeworkController::class, 'HomeworkApprove'])->name('homework.approve');
+    Route::post('/recall/{id}', [HomeworkController::class, 'HomeworkRecall'])->name('homework.recall');
     Route::get('/delete/{id}', [HomeworkController::class, 'HomeworkDelete'])->name('homework.delete');
     Route::get('/download/{id}', [HomeworkController::class, 'HomeworkDownload'])->name('homework.download');
 

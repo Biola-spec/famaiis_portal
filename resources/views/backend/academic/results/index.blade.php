@@ -70,6 +70,15 @@
                                             @endforeach
                                         </select>
                                     </div>
+                                    <div class="col-md-2">
+                                        <label>Status</label>
+                                        <select name="status" class="form-control">
+                                            <option value="">All Status</option>
+                                            <option value="pending" {{ ($filters['status'] ?? null) === 'pending' ? 'selected' : '' }}>Pending</option>
+                                            <option value="approved" {{ ($filters['status'] ?? null) === 'approved' ? 'selected' : '' }}>Approved</option>
+                                            <option value="recalled" {{ ($filters['status'] ?? null) === 'recalled' ? 'selected' : '' }}>Recalled</option>
+                                        </select>
+                                    </div>
                                     <div class="col-md-2" style="padding-top: 25px;">
                                         <button type="submit" class="btn btn-primary btn-block">Filter</button>
                                     </div>
@@ -89,6 +98,8 @@
                                             <th>Exam</th>
                                             <th>Total</th>
                                             <th>Grade</th>
+                                            <th>Status</th>
+                                            <th>Action</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -105,6 +116,45 @@
 
                                                 <td>{{ $result->total_score }}</td>
                                                 <td>{{ $result->grade }}</td>
+                                                <td>
+                                                    @php($statusMap = ['pending' => 'warning', 'approved' => 'success', 'recalled' => 'danger'])
+                                                    <span class="badge badge-{{ $statusMap[$result->status ?? 'pending'] ?? 'secondary' }}">
+                                                        {{ ucfirst($result->status ?? 'pending') }}
+                                                    </span>
+                                                    @if($result->approvedBy)
+                                                        <br><small>By {{ $result->approvedBy->name }}</small>
+                                                    @endif
+                                                    @if($result->recalledBy)
+                                                        <br><small>Recalled by {{ $result->recalledBy->name }}</small>
+                                                    @endif
+                                                </td>
+                                                <td>
+                                                    <a href="{{ route('academic.marks.entry', [
+                                                        'year_id' => $result->session_id ?: $result->year_id,
+                                                        'section_id' => $result->section_id,
+                                                        'class_id' => $result->class_id,
+                                                        'subject_id' => $result->subject_id,
+                                                        'term' => $result->term,
+                                                    ]) }}" class="btn btn-info btn-sm">
+                                                        <i class="fa fa-edit"></i> Edit
+                                                    </a>
+                                                    @if($canModerateResults && ($result->status ?? 'pending') !== 'approved')
+                                                        <form action="{{ route('academic.results.approve', $result->id) }}" method="POST" class="d-inline">
+                                                            @csrf
+                                                            <button type="submit" class="btn btn-success btn-sm">
+                                                                <i class="fa fa-check"></i> Approve
+                                                            </button>
+                                                        </form>
+                                                    @endif
+                                                    @if(($result->status ?? 'pending') === 'approved')
+                                                        <form action="{{ route('academic.results.recall', $result->id) }}" method="POST" class="d-inline">
+                                                            @csrf
+                                                            <button type="submit" class="btn btn-warning btn-sm">
+                                                                <i class="fa fa-undo"></i> Recall
+                                                            </button>
+                                                        </form>
+                                                    @endif
+                                                </td>
                                             </tr>
                                         @endforeach
                                     </tbody>

@@ -25,10 +25,19 @@ class StudentMarks extends Model
         'ca_breakdown',
         'total_score',
         'grade',
+        'status',
+        'entered_by',
+        'approved_by',
+        'approved_at',
+        'recalled_by',
+        'recalled_at',
+        'approval_note',
     ];
 
     protected $casts = [
         'ca_breakdown' => 'array',
+        'approved_at' => 'datetime',
+        'recalled_at' => 'datetime',
     ];
 
     public function student(){
@@ -59,5 +68,20 @@ class StudentMarks extends Model
     public function exam_type()
     {
         return $this->belongsTo(Term::class, 'term_id', 'id');
+    }
+
+    public function enteredBy()
+    {
+        return $this->belongsTo(User::class, 'entered_by');
+    }
+
+    public function approvedBy()
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function recalledBy()
+    {
+        return $this->belongsTo(User::class, 'recalled_by');
     }
 }
