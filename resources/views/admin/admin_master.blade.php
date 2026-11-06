@@ -54,23 +54,23 @@
 
         /* Semantic Design Tokens (Variables) */
         body.light-skin {
-            --bg-body: #F5F7FA;
+            --bg-body: #eef2f7;
             --card-bg: #ffffff;
-            --card-border: #E4E9F0;
-            --text-main: #1E2E4A;
-            --text-muted: #62728D;
-            --heading-color: #0B2447;
+            --card-border: #d8e0eb;
+            --text-main: #1f2d3d;
+            --text-muted: #52647a;
+            --heading-color: #10243e;
             
-            --primary-color: #2E86DE;      /* Sky Blue */
-            --primary-light: #E8F2FC;      /* Sky Blue Tint */
-            --warning-color: #1F3E6C;      /* Navy Blue */
-            --warning-light: #EBEFF6;      /* Navy Blue Tint */
-            --success-color: #0B2447;      /* Navy Blue */
-            --success-light: #EBEFF6;      /* Navy Blue Tint */
-            --danger-color: #E66767;       /* Brand Red */
-            --danger-light: #FDEAEA;       /* Red Tint */
-            --info-color: #2E86DE;         /* Sky Blue */
-            --info-light: #E8F2FC;         /* Sky Blue Tint */
+            --primary-color: #3478c8;
+            --primary-light: #eaf3fd;
+            --warning-color: #ad7114;
+            --warning-light: #fff5df;
+            --success-color: #15805d;
+            --success-light: #e4f5ee;
+            --danger-color: #cc5260;
+            --danger-light: #fdecef;
+            --info-color: #267eaa;
+            --info-light: #e5f4fa;
             --teal-color: #0f766e;
             --teal-light: #ccfbf1;
             --indigo-color: #4f46e5;
@@ -123,7 +123,7 @@
             color: var(--text-main) !important;
         }
 
-        /* Sidebar Styling (Stays dark for both modes to remain premium) */
+        /* Dark sidebar base. Light mode has its own palette below. */
         .main-sidebar {
             background: linear-gradient(180deg, #0f0f12 0%, #1e1e24 100%) !important; /* Premium charcoal gray gradient */
             box-shadow: 4px 0 24px rgba(0, 0, 0, 0.3);
@@ -258,7 +258,7 @@
         .box, .card {
             background-color: var(--card-bg) !important;
             border: 1px solid var(--card-border) !important;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03), 0 2px 4px -1px rgba(0, 0, 0, 0.02) !important;
+            box-shadow: 0 2px 5px rgba(22, 42, 68, 0.06), 0 8px 20px rgba(22, 42, 68, 0.035) !important;
             border-radius: 12px !important;
             color: var(--text-main) !important;
             transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -288,6 +288,13 @@
         /* Text and Typography Overrides to prevent generic text override hacks */
         .text-fade, .text-mute {
             color: var(--text-muted) !important;
+        }
+
+        .light-skin .text-muted,
+        .light-skin .text-fade,
+        .light-skin .text-mute,
+        .light-skin small.text-muted {
+            color: #52647a !important;
         }
 
         /* Soft, Cohesive Theme-aware Table Styling */
@@ -326,7 +333,7 @@
             font-weight: 700 !important;
             text-transform: uppercase;
             letter-spacing: 0.8px;
-            color: var(--text-muted) !important;
+            color: #52647a !important;
             margin-bottom: 6px;
         }
 
@@ -453,6 +460,14 @@
             color: var(--heading-color) !important;
             font-size: 13px !important;
             margin-bottom: 12px;
+        }
+
+        .dashboard-welcome-title {
+            color: #ffffff;
+        }
+
+        .light-skin .dashboard-welcome-title {
+            color: #10243e !important;
         }
 
         .dashboard-insight-strip {
@@ -683,35 +698,39 @@
         /* Light Skin Sidebar Customization           */
         /* ========================================== */
         .light-skin .main-sidebar {
-            background: linear-gradient(180deg, #121215 0%, #222228 100%) !important; /* Premium charcoal gray gradient */
-            box-shadow: 4px 0 24px rgba(0, 0, 0, 0.25);
-            border-right: 1px solid rgba(255, 255, 255, 0.03) !important;
+            background: #ffffff !important;
+            box-shadow: 4px 0 24px rgba(31, 52, 82, 0.06);
+            border-right: 1px solid #e7edf5 !important;
         }
 
         .light-skin .main-sidebar .ulogo h3,
         .light-skin .main-sidebar .sidebar-menu > li > a,
         .light-skin .main-sidebar .sidebar-menu > li.header,
         .light-skin .main-sidebar .sidebar-menu li a span {
-            color: #a1a1aa !important; /* Soft medium gray for readability */
+            color: #334155 !important;
+        }
+
+        .light-skin .main-sidebar .ulogo h3 b {
+            color: #172b4d !important;
         }
 
         .light-skin .main-sidebar .sidebar-menu li a i,
         .light-skin .main-sidebar [data-feather] {
-            color: #a1a1aa !important;
-            stroke: #a1a1aa !important;
+            color: #475569 !important;
+            stroke: #475569 !important;
         }
 
         /* Sidebar hover state in light skin */
         .light-skin .sidebar-menu > li:hover > a {
-            background-color: rgba(255, 255, 255, 0.08) !important;
-            color: #ffffff !important;
-            border-left-color: rgba(255, 255, 255, 0.3) !important;
+            background-color: #f1f6fc !important;
+            color: #1f5fae !important;
+            border-left-color: #8ab8ec !important;
         }
 
         .light-skin .sidebar-menu > li:hover > a i,
         .light-skin .sidebar-menu > li:hover > a [data-feather] {
-            color: #ffffff !important;
-            stroke: #ffffff !important;
+            color: #1f5fae !important;
+            stroke: #1f5fae !important;
         }
 
         /* Override theme-primary purple gradient from color_theme.css */
@@ -767,9 +786,9 @@
         .light-skin .sidebar-menu > li.active > a,
         .light-skin .sidebar-menu > li.active.treeview > a,
         .light-skin .sidebar-menu > li.menu-open > a {
-            background-color: rgba(46, 134, 222, 0.16) !important;
+            background-color: #eaf3fd !important;
             background-image: none !important;
-            color: #ffffff !important;
+            color: #174f91 !important;
             border-left-color: #2E86DE !important;
             box-shadow: none !important;
         }
@@ -778,18 +797,18 @@
         .light-skin .sidebar-menu > li.active > a [data-feather],
         .light-skin .sidebar-menu > li.menu-open > a i,
         .light-skin .sidebar-menu > li.menu-open > a [data-feather] {
-            color: #5eb3ff !important;
-            stroke: #5eb3ff !important;
+            color: #2878c7 !important;
+            stroke: #2878c7 !important;
             filter: none !important;
         }
 
         .light-skin .sidebar-menu .treeview-menu > li > a {
-            color: #a1a1aa !important;
+            color: #334155 !important;
         }
 
         .light-skin .sidebar-menu .treeview-menu > li > a:hover,
         .light-skin .sidebar-menu .treeview-menu > li.active > a {
-            color: #ffffff !important;
+            color: #174f91 !important;
         }
 
         /* ========================================== */

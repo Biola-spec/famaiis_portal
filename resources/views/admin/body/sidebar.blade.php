@@ -531,12 +531,12 @@
         opacity: 0.9 !important;
     }
 
-    /* 3. LIGHT MODE STYLING (Purple sidebar, White scrollbar) */
+    /* 3. LIGHT MODE STYLING */
     body.light-skin .sidebar::-webkit-scrollbar-thumb,
     body.light-skin .main-sidebar::-webkit-scrollbar-thumb,
     body.light-skin .slimScrollBar {
-        background: rgba(255, 255, 255, 0.7) !important; /* Semi-transparent White */
-        border: 1px solid rgba(0, 0, 0, 0.05);
+        background: #cbd7e6 !important;
+        border: 1px solid rgba(31, 52, 82, 0.08);
         border-radius: 10px !important;
         opacity: 0.9 !important;
     }
@@ -548,7 +548,7 @@
     }
     body.light-skin .sidebar, body.light-skin .main-sidebar {
         scrollbar-width: auto !important;
-        scrollbar-color: rgba(255, 255, 255, 0.7) rgba(0, 0, 0, 0.1) !important;
+        scrollbar-color: #cbd7e6 #f1f4f8 !important;
     }
 </style>
 

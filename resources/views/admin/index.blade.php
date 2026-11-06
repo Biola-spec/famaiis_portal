@@ -120,7 +120,7 @@
             @endphp
             <img src="{{ $imagePath }}" class="rounded-circle h-100 w-100 mr-20" style="max-width: 80px; object-fit: cover; border: 3px solid #512da8;" alt="User Image">
             <div>
-                <h4 class="text-white mb-0">{{ __('ui.welcome_back') }}, {{ $user->name }}!</h4>
+                <h4 class="dashboard-welcome-title mb-0">{{ __('ui.welcome_back') }}, {{ $user->name }}!</h4>
                 <p class="text-fade mb-0">{{ __('ui.sidebar_nav_tip') }}</p>
             </div>
         </div>

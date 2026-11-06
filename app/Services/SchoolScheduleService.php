@@ -35,8 +35,10 @@ class SchoolScheduleService
 
         $now = Carbon::now();
         $currentMonthKey = $now->format('Y-m');
+        $startDate = $now->copy()->subMonths(3)->startOfMonth();
+        $endDate = $now->copy()->addMonths(9)->endOfMonth();
 
-        // Build list of months (past 2 months to next 9 months, plus any months with events)
+        // Build the months used by the dashboard calendar.
         $monthsMap = collect();
         for ($i = -2; $i <= 9; $i++) {
             $dt = $now->copy()->addMonths($i);
@@ -51,7 +53,8 @@ class SchoolScheduleService
             ]);
         }
 
-        $eventMonths = Event::selectRaw("DATE_FORMAT(event_date, '%Y-%m') as month_key, DATE_FORMAT(event_date, '%b %Y') as month_label, DATE_FORMAT(event_date, '%M %Y') as full_label, YEAR(event_date) as year_num, MONTH(event_date) as month_num")
+        $eventMonths = Event::whereBetween('event_date', [$startDate, $endDate])
+            ->selectRaw("DATE_FORMAT(event_date, '%Y-%m') as month_key, DATE_FORMAT(event_date, '%b %Y') as month_label, DATE_FORMAT(event_date, '%M %Y') as full_label, YEAR(event_date) as year_num, MONTH(event_date) as month_num")
             ->groupBy('month_key', 'month_label', 'full_label', 'year_num', 'month_num')
             ->orderBy('month_key')
             ->get();
@@ -70,9 +73,6 @@ class SchoolScheduleService
         }
 
         $monthsList = $monthsMap->sortBy('key')->values()->all();
-
-        $startDate = $now->copy()->subMonths(3)->startOfMonth();
-        $endDate = $now->copy()->addMonths(9)->endOfMonth();
 
         return [
             'upcoming_events' => Event::with('section')
